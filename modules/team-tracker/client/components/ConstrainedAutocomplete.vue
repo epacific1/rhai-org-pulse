@@ -29,7 +29,8 @@ const availableOptions = computed(() => {
   return opts.filter(o => o.toLowerCase().includes(term)).slice(0, 20)
 })
 
-function onInput() {
+function onInput(event) {
+  updateDropdownPosition(event.target)
   isOpen.value = true
   highlightedIndex.value = -1
 }
@@ -80,7 +81,8 @@ if (!props.multiValue && props.modelValue) {
   searchText.value = props.modelValue
 }
 
-function onFocus() {
+function onFocus(event) {
+  updateDropdownPosition(event.target)
   isOpen.value = true
   if (!props.multiValue) {
     searchText.value = ''
@@ -88,9 +90,26 @@ function onFocus() {
 }
 
 const rootEl = ref(null)
+const dropdownEl = ref(null)
+const dropdownStyle = ref({})
+
+function updateDropdownPosition(el) {
+  const target = el || rootEl.value?.querySelector('input')
+  if (!target) return
+  const rect = target.getBoundingClientRect()
+  dropdownStyle.value = {
+    position: 'fixed',
+    top: `${rect.bottom + 4}px`,
+    left: `${rect.left}px`,
+    width: `${rect.width}px`,
+    zIndex: 50
+  }
+}
 
 function onClickOutside(e) {
-  if (rootEl.value && !rootEl.value.contains(e.target)) {
+  const inRoot = rootEl.value && rootEl.value.contains(e.target)
+  const inDropdown = dropdownEl.value && dropdownEl.value.contains(e.target)
+  if (!inRoot && !inDropdown) {
     isOpen.value = false
     if (!props.multiValue) {
       searchText.value = props.modelValue || ''
@@ -129,26 +148,30 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onClickOutside))
       @click="onFocus"
       @keydown="onKeydown"
     >
-    <ul
-      v-if="isOpen && availableOptions.length > 0"
-      role="listbox"
-      class="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-lg max-h-48 overflow-y-auto"
-    >
-      <li
-        v-for="(opt, idx) in availableOptions"
-        :key="opt"
-        :id="`ca-opt-${idx}`"
-        role="option"
-        :aria-selected="highlightedIndex === idx"
-        class="px-3 py-2 text-sm cursor-pointer"
-        :class="highlightedIndex === idx ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'"
-        @mousedown.prevent="selectOption(opt)"
+    <Teleport to="body">
+      <ul
+        v-if="isOpen && availableOptions.length > 0"
+        ref="dropdownEl"
+        role="listbox"
+        :style="dropdownStyle"
+        class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-lg max-h-48 overflow-y-auto"
       >
-        {{ opt }}
-      </li>
-    </ul>
-    <div v-if="isOpen && searchText && availableOptions.length === 0" class="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-lg px-3 py-2 text-sm text-gray-400 dark:text-gray-500">
-      No matches
-    </div>
+        <li
+          v-for="(opt, idx) in availableOptions"
+          :key="opt"
+          :id="`ca-opt-${idx}`"
+          role="option"
+          :aria-selected="highlightedIndex === idx"
+          class="px-3 py-2 text-sm cursor-pointer"
+          :class="highlightedIndex === idx ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'"
+          @mousedown.prevent="selectOption(opt)"
+        >
+          {{ opt }}
+        </li>
+      </ul>
+      <div v-if="isOpen && searchText && availableOptions.length === 0" :style="dropdownStyle" class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-lg px-3 py-2 text-sm text-gray-400 dark:text-gray-500">
+        No matches
+      </div>
+    </Teleport>
   </div>
 </template>

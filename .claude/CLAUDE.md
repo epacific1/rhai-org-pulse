@@ -291,6 +291,7 @@ In production, all routes are authenticated via OpenShift OAuth proxy. The proxy
 - `/api/modules/team-tracker/org-teams/:teamKey` — single org-roster team detail (teamKey = `org::teamName`)
 - `/api/modules/team-tracker/org-teams/:teamKey/members` — members of an org-roster team
 - `/api/modules/team-tracker/permissions/me` — current user's permission tier and managed UIDs
+- `/api/modules/team-tracker/manager/dashboard` — manager dashboard data: purview teams, direct reports, field definitions (authenticated, requires manager tier or above). Returns `reason` field for empty states (`no-registry-identity`, `no-direct-reports`). Returns 403 for non-managers.
 - `/api/modules/team-tracker/structure/teams` — list all teams (optional `orgKey` filter)
 - `/api/modules/team-tracker/structure/unassigned` — list unassigned people (query: `scope=direct|org|all`)
 - `/api/modules/team-tracker/structure/field-definitions` — list all field definitions (person + team). Field definitions with `optionsRef` have their `allowedValues` resolved from the referenced field option set (with `_resolvedFromOptions: true` flag).

@@ -491,6 +491,121 @@ module.exports = function registerRoutes(router, context) {
     });
   });
 
+  // ─── Manager Dashboard ───
+
+  const { getManagerPurview } = require('./manager-purview');
+
+  /**
+   * @openapi
+   * /api/modules/team-tracker/manager/dashboard:
+   *   get:
+   *     tags: ['TT: Manager']
+   *     summary: Get manager dashboard data (purview, reports, teams, field definitions)
+   *     responses:
+   *       200:
+   *         description: Manager purview data
+   *       403:
+   *         description: User is not a manager
+   */
+  router.get('/manager/dashboard', function(req, res) {
+    // Handle null userUid (e.g. local dev where email isn't in registry)
+    if (!req.userUid) {
+      return res.json({
+        manager: null,
+        directReports: [],
+        teams: [],
+        fieldDefinitions: { person: [], team: [] },
+        reason: 'no-registry-identity'
+      });
+    }
+
+    const registry = readFromStorage('team-data/registry.json');
+    if (!registry || !registry.people) {
+      return res.json({
+        manager: null,
+        directReports: [],
+        teams: [],
+        fieldDefinitions: { person: [], team: [] },
+        reason: 'no-registry-identity'
+      });
+    }
+
+    const managerPerson = registry.people[req.userUid];
+
+    // Check if user has direct reports (is a manager)
+    const directReportSet = permissions.getDirectReports(req.userUid, registry);
+    if (directReportSet.size === 0) {
+      // If the user is admin or team-admin, return no-direct-reports rather than 403
+      if (req.isAdmin || req.isTeamAdmin) {
+        return res.json({
+          manager: managerPerson ? {
+            uid: req.userUid,
+            name: managerPerson.name || null,
+            email: managerPerson.email || null
+          } : null,
+          directReports: [],
+          teams: [],
+          fieldDefinitions: { person: [], team: [] },
+          reason: 'no-direct-reports'
+        });
+      }
+      return res.status(403).json({ error: 'You are not a manager' });
+    }
+
+    const teamStore = require('../../../shared/server/team-store');
+    const fieldStore = require('../../../shared/server/field-store');
+    const fieldOptionsStore = require('./field-options-store');
+    const teamsData = teamStore.readTeams(storage);
+    const fieldDefs = fieldStore.readFieldDefinitions(storage);
+    const personFieldDefs = fieldDefs ? fieldDefs.personFields.filter(f => !f.deleted) : [];
+    const teamFieldDefs = fieldDefs ? fieldDefs.teamFields.filter(f => !f.deleted) : [];
+
+    // Resolve optionsRef fields (e.g. Component) so allowedValues are populated
+    for (const field of [...personFieldDefs, ...teamFieldDefs]) {
+      if (field.optionsRef && !field.allowedValues) {
+        const values = fieldOptionsStore.getValues(storage, field.optionsRef);
+        if (values) {
+          field.allowedValues = values;
+          field._resolvedFromOptions = true;
+        }
+      }
+    }
+
+    const purview = getManagerPurview(req.userUid, registry, teamsData);
+
+    // Build enriched direct reports with customFields
+    const directReports = purview.directReportUids.map(uid => {
+      const person = registry.people[uid];
+      if (!person) return null;
+      const customFields = {};
+      for (const fieldDef of personFieldDefs) {
+        customFields[fieldDef.id] = person._appFields?.[fieldDef.id] || null;
+      }
+      return {
+        uid: person.uid,
+        name: person.name || null,
+        email: person.email || null,
+        title: person.title || null,
+        teamIds: person.teamIds || [],
+        customFields
+      };
+    }).filter(Boolean);
+
+    res.json({
+      manager: managerPerson ? {
+        uid: req.userUid,
+        name: managerPerson.name || null,
+        email: managerPerson.email || null
+      } : null,
+      directReports,
+      teams: purview.teams,
+      fieldDefinitions: {
+        person: personFieldDefs,
+        team: teamFieldDefs
+      }
+    });
+  });
+
   // ─── Routes: Team Structure Management ───
 
   const teamStore = require('../../../shared/server/team-store');

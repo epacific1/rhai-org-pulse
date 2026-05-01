@@ -263,7 +263,8 @@ import {
   KeyRound,
   ClipboardList,
   History,
-  Hospital
+  Hospital,
+  LayoutDashboard
 } from 'lucide-vue-next'
 import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 
@@ -305,7 +306,8 @@ const ICON_MAP = {
   ClipboardList,
   History,
   Hospital,
-  'hospital': Hospital
+  'hospital': Hospital,
+  LayoutDashboard
 }
 
 const props = defineProps({
@@ -316,6 +318,7 @@ const props = defineProps({
   user: Object,
   isAdmin: Boolean,
   isTeamAdmin: { type: Boolean, default: false },
+  isManager: { type: Boolean, default: false },
   modules: { type: Array, default: () => [] },
   builtInManifests: { type: Array, default: () => [] },
   titlePrefix: { type: String, default: '' },
@@ -389,6 +392,7 @@ const navSections = computed(() => {
           if (!item.requireRole) return true
           if (props.isAdmin) return true
           if (item.requireRole === 'team-admin') return props.isTeamAdmin
+          if (item.requireRole === 'manager') return props.isManager || props.isTeamAdmin
           return false
         })
         .map(item => ({
