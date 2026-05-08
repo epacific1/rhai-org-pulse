@@ -1088,7 +1088,7 @@ module.exports = function registerRoutes(router, context) {
 
   // ─── Team Field Values ───
 
-  router.patch('/structure/teams/:teamId/fields', requireTeamAdmin, function(req, res) {
+  router.patch('/structure/teams/:teamId/fields', requireTeamPurview, function(req, res) {
     const guard = demoWriteGuard(res);
     if (guard) return;
     if (typeof req.body !== 'object' || Array.isArray(req.body) || !req.body) {

@@ -18,6 +18,7 @@ const ldapLoading = ref(false)
 const ldapAvailable = ref(true)
 const ldapError = ref(null)
 let ldapDebounceTimer = null
+let blurTimer = null
 
 const filteredPeople = computed(() => {
   if (!searchText.value) return props.people.slice(0, 10)
@@ -47,6 +48,7 @@ initSearchText()
 
 onUnmounted(() => {
   if (ldapDebounceTimer) clearTimeout(ldapDebounceTimer)
+  if (blurTimer) clearTimeout(blurTimer)
 })
 
 // Re-initialize when modelValue changes externally
@@ -97,7 +99,8 @@ function onInput() {
 }
 
 function onBlur() {
-  setTimeout(() => { isOpen.value = false }, 200)
+  if (blurTimer) clearTimeout(blurTimer)
+  blurTimer = setTimeout(() => { isOpen.value = false }, 200)
 }
 
 async function selectPerson(person) {

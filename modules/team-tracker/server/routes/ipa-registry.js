@@ -409,8 +409,9 @@ function registerIpaRegistryRoutes(router, context) {
         res.json({ results: enriched });
       } catch (err) {
         clearTimeout(timeout);
+        console.error('[ipa-registry] LDAP search error:', err);
         if (!res.headersSent) {
-          res.status(500).json({ error: 'LDAP search failed: ' + err.message });
+          res.status(500).json({ error: 'LDAP search failed' });
         }
       } finally {
         if (conn && conn.client) {
@@ -514,8 +515,9 @@ function registerIpaRegistryRoutes(router, context) {
         res.json({ person: reg.people[uid], created: true });
       } catch (err) {
         clearTimeout(timeout);
+        console.error('[ipa-registry] LDAP import error:', err);
         if (!res.headersSent) {
-          res.status(500).json({ error: 'LDAP import failed: ' + err.message });
+          res.status(500).json({ error: 'LDAP import failed' });
         }
       } finally {
         if (conn && conn.client) {

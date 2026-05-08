@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { useTeams } from '@shared/client/composables/useTeams'
 import PersonAutocomplete from './PersonAutocomplete.vue'
 import ConstrainedAutocomplete from './ConstrainedAutocomplete.vue'
@@ -23,9 +23,18 @@ const saving = ref(false)
 const demoInfo = ref(null)
 const touchedFields = ref(new Set())
 const fieldWarnings = ref({})
+let demoTimer = null
+
+onUnmounted(() => {
+  if (demoTimer) clearTimeout(demoTimer)
+})
 
 watch(demoToast, (msg) => {
-  if (msg) { demoInfo.value = msg; setTimeout(() => { demoInfo.value = null }, 3000) }
+  if (msg) {
+    demoInfo.value = msg
+    if (demoTimer) clearTimeout(demoTimer)
+    demoTimer = setTimeout(() => { demoInfo.value = null }, 3000)
+  }
 })
 
 const visibleFields = computed(() =>
