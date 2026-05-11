@@ -938,14 +938,6 @@ JSON Lines format (one JSON object per line). Partitioned by month for efficient
 }
 ```
 
-### Viewer List — `data/health-metrics/viewers.json`
-
-```json
-{
-  "emails": ["viewer1@redhat.com", "viewer2@redhat.com"]
-}
-```
-
 ---
 
 ## Fixture Rules

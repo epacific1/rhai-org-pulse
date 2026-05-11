@@ -157,9 +157,9 @@ async function loadFieldDefinitions() {
 async function loadViewers() {
   try {
     const data = await apiRequest('/roles')
-    const allRoles = data.roles || data || {}
-    viewers.value = Object.entries(allRoles)
-      .filter(([, roles]) => Array.isArray(roles) && roles.includes('usage-metrics-viewer'))
+    const allAssignments = data.assignments || {}
+    viewers.value = Object.entries(allAssignments)
+      .filter(([, entry]) => Array.isArray(entry.roles) && entry.roles.includes('usage-metrics-viewer'))
       .map(([email]) => ({ email }))
   } catch { /* ignore */ }
 }

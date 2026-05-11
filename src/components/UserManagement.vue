@@ -120,7 +120,7 @@
                 class="ml-1 text-xs text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
                 :title="`Remove ${role} role`"
               >
-                Remove {{ role === 'admin' ? 'Admin' : 'Team Admin' }}
+                Remove {{ { admin: 'Admin', 'team-admin': 'Team Admin', 'usage-metrics-viewer': 'Metrics Viewer' }[role] || role }}
               </button>
             </td>
           </tr>
