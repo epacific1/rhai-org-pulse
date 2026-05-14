@@ -193,4 +193,4 @@ function applyJiraFields(data, issue) {
   return reviewStatusChanged ? 'status_changed' : 'updated';
 }
 
-module.exports = { syncTestPlansFromJira, syncTestPlanData, applyJiraFields, extractSignOffInfo, testPlanLock, acquireLock, releaseLock };
+module.exports = { syncTestPlansFromJira, syncTestPlanData, applyJiraFields, extractSignOffInfo, acquireLock, releaseLock };

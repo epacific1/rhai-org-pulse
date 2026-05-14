@@ -33,10 +33,18 @@ export function getCriterionLabel(criterion) {
     .join(' ')
 }
 
-export function getCriterionScoreClass(score) {
-  if (score === 2) return 'text-green-600 dark:text-green-400'
-  if (score === 1) return 'text-amber-600 dark:text-amber-400'
-  return 'text-red-600 dark:text-red-400'
+export { getScoreClass as getCriterionScoreClass } from './feature-helpers.js'
+
+export function getCriterionScoreBgClass(score) {
+  if (score === 2) return 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200'
+  if (score === 1) return 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200'
+  return 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200'
+}
+
+export function getCriterionScoreLabel(score) {
+  if (score === 2) return 'Pass'
+  if (score === 1) return 'Revise'
+  return 'Fail'
 }
 
 export function getScoreColorClass(score, max = 10) {

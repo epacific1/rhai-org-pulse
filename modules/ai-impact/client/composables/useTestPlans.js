@@ -56,7 +56,6 @@ export function useTestPlans() {
     testPlanLoading,
     testPlanError,
     loadTestPlans,
-    loadTestPlanDetail,
-    detailCache
+    loadTestPlanDetail
   }
 }

@@ -125,10 +125,11 @@ module.exports = function registerTestPlanRoutes(router, context) {
       counts[status]++;
     }
 
-    data.lastSyncedAt = new Date().toISOString();
-    data.totalTestPlans = Object.keys(data.testPlans).length;
-
-    writeTestPlansAtomic(data);
+    if (counts.created > 0 || counts.updated > 0) {
+      data.lastSyncedAt = new Date().toISOString();
+      data.totalTestPlans = Object.keys(data.testPlans).length;
+      writeTestPlansAtomic(data);
+    }
 
     res.json({
       created: counts.created,

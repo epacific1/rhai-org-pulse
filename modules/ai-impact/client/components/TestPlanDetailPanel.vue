@@ -4,7 +4,8 @@ import PipelineTimeline from './PipelineTimeline.vue'
 import FeedbackText from './FeedbackText.vue'
 import GapAnalysisText from './GapAnalysisText.vue'
 import InfoBubble from './InfoBubble.vue'
-import { getVerdictBgClass, getVerdictLabel, getCriterionLabel, getCriterionScoreClass, getScoreColorClass, CRITERIA } from '../utils/test-plan-helpers.js'
+import { getVerdictBgClass, getVerdictLabel, getCriterionLabel, getCriterionScoreClass, getCriterionScoreBgClass, getCriterionScoreLabel, getScoreColorClass, CRITERIA } from '../utils/test-plan-helpers.js'
+import { getReviewStatusClass } from '../utils/feature-helpers.js'
 
 const props = defineProps({
   show: { type: Boolean, default: false },
@@ -83,12 +84,6 @@ function toggleCriterion(criterion) {
   expandedCriteria.value = { ...expandedCriteria.value, [criterion]: !expandedCriteria.value[criterion] }
 }
 
-function getReviewStatusClass(status) {
-  if (status === 'approved') return 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200'
-  if (status === 'needs-review') return 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200'
-  return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200'
-}
-
 function getReviewStatusLabel(status) {
   if (status === 'approved') return 'Approved'
   if (status === 'needs-review') return 'Needs Review'
@@ -97,6 +92,14 @@ function getReviewStatusLabel(status) {
 
 const history = computed(() => planDetail.value?.history || [])
 const currentPlan = computed(() => planDetail.value?.latest || props.plan)
+const allHistoryEntries = computed(() => {
+  const entries = []
+  if (currentPlan.value?.reviewedAt) {
+    entries.push(currentPlan.value)
+  }
+  entries.push(...history.value)
+  return entries
+})
 </script>
 
 <template>
@@ -218,9 +221,9 @@ const currentPlan = computed(() => planDetail.value?.latest || props.plan)
                     </span>
                     <span
                       class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
-                      :class="(currentPlan?.scores?.[criterion] ?? 0) === 2 ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200' : (currentPlan?.scores?.[criterion] ?? 0) === 1 ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200' : 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200'"
+                      :class="getCriterionScoreBgClass(currentPlan?.scores?.[criterion] ?? 0)"
                     >
-                      {{ (currentPlan?.scores?.[criterion] ?? 0) === 2 ? 'Pass' : (currentPlan?.scores?.[criterion] ?? 0) === 1 ? 'Revise' : 'Fail' }}
+                      {{ getCriterionScoreLabel(currentPlan?.scores?.[criterion] ?? 0) }}
                     </span>
                   </div>
                   <div v-if="expandedCriteria[criterion] && currentPlan?.criterionNotes?.[criterion]" class="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700">
@@ -237,30 +240,9 @@ const currentPlan = computed(() => planDetail.value?.latest || props.plan)
             <div class="border-t border-gray-200 dark:border-gray-700 pt-4 mb-4">
               <h4 class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Score History</h4>
               <div class="space-y-2">
-                <!-- Current (latest) entry -->
                 <div
-                  v-if="currentPlan?.reviewedAt"
-                  class="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700"
-                >
-                  <span class="text-xs text-gray-500 dark:text-gray-400">
-                    {{ new Date(currentPlan.reviewedAt).toLocaleDateString() }}
-                  </span>
-                  <div class="flex items-center gap-2">
-                    <span class="text-sm font-medium" :class="getScoreColorClass(currentPlan.score || 0)">
-                      {{ currentPlan.score || 0 }}/10
-                    </span>
-                    <span
-                      class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
-                      :class="getVerdictBgClass(currentPlan.verdict)"
-                    >
-                      {{ getVerdictLabel(currentPlan.verdict) }}
-                    </span>
-                  </div>
-                </div>
-                <!-- Prior entries -->
-                <div
-                  v-for="(entry, idx) in history"
-                  :key="idx"
+                  v-for="(entry, idx) in allHistoryEntries"
+                  :key="entry.reviewedAt || idx"
                   class="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700 last:border-0"
                 >
                   <span class="text-xs text-gray-500 dark:text-gray-400">

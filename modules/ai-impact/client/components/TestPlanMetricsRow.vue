@@ -7,28 +7,23 @@ const props = defineProps({
 
 const planList = computed(() => Object.values(props.testPlans))
 
-const totalPlans = computed(() => planList.value.length)
-
-const avgScore = computed(() => {
-  if (totalPlans.value === 0) return 0
-  const sum = planList.value.reduce((acc, p) => acc + (p.score || 0), 0)
-  return (sum / totalPlans.value).toFixed(1)
-})
-
-const readyCount = computed(() => {
-  return planList.value.filter(p => p.verdict === 'Ready').length
-})
-
-const reviseCount = computed(() => {
-  return planList.value.filter(p => p.verdict === 'Revise').length
-})
-
-const reworkCount = computed(() => {
-  return planList.value.filter(p => p.verdict === 'Rework').length
-})
-
-const autoRevisedCount = computed(() => {
-  return planList.value.filter(p => p.autoRevised).length
+const stats = computed(() => {
+  let sum = 0, ready = 0, revise = 0, rework = 0, autoRevised = 0
+  for (const p of planList.value) {
+    sum += (p.score || 0)
+    if (p.verdict === 'Ready') ready++
+    else if (p.verdict === 'Revise') revise++
+    else if (p.verdict === 'Rework') rework++
+    if (p.autoRevised) autoRevised++
+  }
+  return {
+    total: planList.value.length,
+    avg: planList.value.length ? (sum / planList.value.length).toFixed(1) : 0,
+    ready,
+    revise,
+    rework,
+    autoRevised
+  }
 })
 </script>
 
@@ -37,40 +32,40 @@ const autoRevisedCount = computed(() => {
     <div class="grid gap-6 grid-cols-2 lg:grid-cols-6">
       <div class="space-y-1">
         <p class="text-sm text-gray-500 dark:text-gray-400">Total Plans</p>
-        <span class="text-3xl font-bold dark:text-gray-100">{{ totalPlans }}</span>
+        <span class="text-3xl font-bold dark:text-gray-100">{{ stats.total }}</span>
       </div>
 
       <div class="space-y-1">
         <p class="text-sm text-gray-500 dark:text-gray-400">Avg Score</p>
-        <span class="text-3xl font-bold dark:text-gray-100">{{ avgScore }}</span>
+        <span class="text-3xl font-bold dark:text-gray-100">{{ stats.avg }}</span>
         <p class="text-xs text-gray-400 dark:text-gray-500">out of 10</p>
       </div>
 
       <div class="space-y-1">
         <p class="text-sm text-gray-500 dark:text-gray-400">Ready</p>
-        <span class="text-3xl font-bold" :class="readyCount > 0 ? 'text-green-600 dark:text-green-400' : 'dark:text-gray-100'">
-          {{ readyCount }}
+        <span class="text-3xl font-bold" :class="stats.ready > 0 ? 'text-green-600 dark:text-green-400' : 'dark:text-gray-100'">
+          {{ stats.ready }}
         </span>
       </div>
 
       <div class="space-y-1">
         <p class="text-sm text-gray-500 dark:text-gray-400">Revise</p>
-        <span class="text-3xl font-bold" :class="reviseCount > 0 ? 'text-amber-600 dark:text-amber-400' : 'dark:text-gray-100'">
-          {{ reviseCount }}
+        <span class="text-3xl font-bold" :class="stats.revise > 0 ? 'text-amber-600 dark:text-amber-400' : 'dark:text-gray-100'">
+          {{ stats.revise }}
         </span>
       </div>
 
       <div class="space-y-1">
         <p class="text-sm text-gray-500 dark:text-gray-400">Rework</p>
-        <span class="text-3xl font-bold" :class="reworkCount > 0 ? 'text-red-600 dark:text-red-400' : 'dark:text-gray-100'">
-          {{ reworkCount }}
+        <span class="text-3xl font-bold" :class="stats.rework > 0 ? 'text-red-600 dark:text-red-400' : 'dark:text-gray-100'">
+          {{ stats.rework }}
         </span>
       </div>
 
       <div class="space-y-1">
         <p class="text-sm text-gray-500 dark:text-gray-400">Auto-revised</p>
-        <span class="text-3xl font-bold" :class="autoRevisedCount > 0 ? 'text-blue-600 dark:text-blue-400' : 'dark:text-gray-100'">
-          {{ autoRevisedCount }}
+        <span class="text-3xl font-bold" :class="stats.autoRevised > 0 ? 'text-blue-600 dark:text-blue-400' : 'dark:text-gray-100'">
+          {{ stats.autoRevised }}
         </span>
       </div>
     </div>
