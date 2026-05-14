@@ -13,9 +13,8 @@ describe('useAIReview', () => {
   });
 
   it('initializes with empty state', () => {
-    const { aiReview, rfeAssessment, aiReviewLoading, aiReviewError } = useAIReview();
+    const { aiReview, aiReviewLoading, aiReviewError } = useAIReview();
     expect(aiReview.value).toBeNull();
-    expect(rfeAssessment.value).toBeNull();
     expect(aiReviewLoading.value).toBe(false);
     expect(aiReviewError.value).toBeNull();
   });
@@ -35,26 +34,18 @@ describe('useAIReview', () => {
     expect(aiReviewLoading.value).toBe(false);
   });
 
-  it('fetches RFE assessment when sourceRfe exists', async () => {
+  it('does not fetch RFE assessment separately', async () => {
     const featureData = {
       latest: { recommendation: 'approve', sourceRfe: 'RHAIRFE-456' },
       history: []
     };
-    const rfeData = {
-      latest: { total: 8, passFail: 'PASS', scores: {} },
-      history: []
-    };
-    mockApiRequest
-      .mockResolvedValueOnce(featureData)
-      .mockResolvedValueOnce(rfeData);
+    mockApiRequest.mockResolvedValue(featureData);
 
-    const { aiReview, rfeAssessment, loadAIReview } = useAIReview();
+    const { aiReview, loadAIReview } = useAIReview();
     await loadAIReview('RHAISTRAT-123');
 
-    expect(mockApiRequest).toHaveBeenCalledTimes(2);
-    expect(mockApiRequest).toHaveBeenCalledWith('/modules/ai-impact/assessments/RHAIRFE-456');
+    expect(mockApiRequest).toHaveBeenCalledTimes(1);
     expect(aiReview.value).toEqual(featureData);
-    expect(rfeAssessment.value).toEqual(rfeData);
   });
 
   it('handles 404 gracefully (no AI Impact data)', async () => {
@@ -78,25 +69,6 @@ describe('useAIReview', () => {
     await loadAIReview('RHAISTRAT-123');
 
     expect(aiReviewError.value).toBe('Server error');
-  });
-
-  it('handles RFE fetch 404 gracefully', async () => {
-    const featureData = {
-      latest: { recommendation: 'approve', sourceRfe: 'RHAIRFE-456' },
-      history: []
-    };
-    const rfeErr = new Error('Not Found');
-    rfeErr.status = 404;
-    mockApiRequest
-      .mockResolvedValueOnce(featureData)
-      .mockRejectedValueOnce(rfeErr);
-
-    const { aiReview, rfeAssessment, aiReviewError, loadAIReview } = useAIReview();
-    await loadAIReview('RHAISTRAT-123');
-
-    expect(aiReview.value).toEqual(featureData);
-    expect(rfeAssessment.value).toBeNull();
-    expect(aiReviewError.value).toBeNull();
   });
 
   it('manages loading state', async () => {

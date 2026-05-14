@@ -9,16 +9,11 @@ import {
   getReviewStatusTooltip
 } from '../utils/ai-review-helpers.js'
 import AIInfoBubble from './AIInfoBubble.vue'
-import AIFeedbackText from './AIFeedbackText.vue'
-import AIAssessmentBreakdown from './AIAssessmentBreakdown.vue'
-import AIAssessmentHistory from './AIAssessmentHistory.vue'
 
 defineProps({
   featureReview: { type: Object, default: null },
-  rfeAssessment: { type: Object, default: null },
   loading: { type: Boolean, default: false },
-  error: { type: String, default: null },
-  jiraHost: { type: String, default: null }
+  error: { type: String, default: null }
 })
 
 const DIMENSIONS = ['feasibility', 'testability', 'scope', 'architecture']
@@ -159,58 +154,6 @@ const DIMENSIONS = ['feasibility', 'testability', 'scope', 'architecture']
         </div>
       </div>
 
-      <!-- Source RFE Section -->
-      <div v-if="featureReview.latest?.sourceRfe" class="border-t border-gray-200 dark:border-gray-700 pt-4">
-        <h4 class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-          Source RFE
-          <a
-            v-if="jiraHost"
-            :href="`${jiraHost}/browse/${featureReview.latest.sourceRfe}`"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="ml-2 font-mono text-blue-600 dark:text-blue-400 hover:underline normal-case"
-          >
-            {{ featureReview.latest.sourceRfe }}
-            <svg class="inline h-3 w-3 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-            </svg>
-          </a>
-          <span v-else class="ml-2 font-mono normal-case dark:text-gray-300">{{ featureReview.latest.sourceRfe }}</span>
-        </h4>
-
-        <!-- RFE Assessment -->
-        <template v-if="rfeAssessment?.latest">
-          <div class="space-y-4">
-            <AIAssessmentBreakdown
-              :assessment="rfeAssessment.latest"
-              :detail="rfeAssessment"
-            />
-
-            <!-- Verdict -->
-            <div v-if="rfeAssessment.latest.verdict" class="pt-2">
-              <h5 class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Verdict</h5>
-              <p class="text-sm text-gray-700 dark:text-gray-300">{{ rfeAssessment.latest.verdict }}</p>
-            </div>
-
-            <!-- Feedback -->
-            <div v-if="rfeAssessment.latest.feedback">
-              <h5 class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Feedback</h5>
-              <AIFeedbackText :text="rfeAssessment.latest.feedback" />
-            </div>
-
-            <!-- Assessment History -->
-            <AIAssessmentHistory
-              :history="rfeAssessment.history || []"
-              :currentTotal="rfeAssessment.latest.total"
-              :currentAssessedAt="rfeAssessment.latest.assessedAt"
-              :currentScores="rfeAssessment.latest.scores"
-            />
-          </div>
-        </template>
-        <div v-else class="text-sm text-gray-400 dark:text-gray-500 italic">
-          No RFE assessment data available.
-        </div>
-      </div>
     </template>
   </div>
 </template>

@@ -100,17 +100,15 @@ describe('RFEReviewView navigation', () => {
     });
   }
 
-  it('navigates to Feature Traffic when RFE has linked feature', async () => {
+  it('opens modal when RFE has linked feature', async () => {
     const wrapper = mountView();
     const phaseContent = wrapper.findComponent(PhaseContentStub);
 
     phaseContent.vm.$emit('selectRFE', { key: 'RHAIRFE-1', summary: 'RFE with feature' });
     await nextTick();
 
-    expect(mockCrossNavigate).toHaveBeenCalledWith('feature-traffic', 'feature-detail', {
-      key: 'RHAISTRAT-10',
-      fromRfe: 'RHAIRFE-1'
-    });
+    expect(mockCrossNavigate).not.toHaveBeenCalled();
+    expect(moduleNav.navigateTo).toHaveBeenCalledWith('rfe-review', { select: 'RHAIRFE-1' });
   });
 
   it('opens modal when RFE has no linked feature', async () => {

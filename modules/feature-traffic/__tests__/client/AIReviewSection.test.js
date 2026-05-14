@@ -67,35 +67,6 @@ describe('AIReviewSection', () => {
     expect(wrapper.text()).toContain('testability');
   });
 
-  it('renders source RFE assessment when present', () => {
-    const wrapper = mount(AIReviewSection, {
-      props: {
-        featureReview: {
-          latest: {
-            recommendation: 'approve',
-            sourceRfe: 'RHAIRFE-123',
-            scores: { total: 7 },
-            reviewers: {}
-          },
-          history: []
-        },
-        rfeAssessment: {
-          latest: {
-            total: 8,
-            passFail: 'PASS',
-            scores: { what: 2, why: 2, how: 2, task: 1, size: 1 }
-          },
-          history: []
-        },
-        jiraHost: 'https://redhat.atlassian.net'
-      }
-    });
-    expect(wrapper.text()).toContain('Source RFE');
-    expect(wrapper.text()).toContain('RHAIRFE-123');
-    expect(wrapper.text()).toContain('8');
-    expect(wrapper.text()).toContain('PASS');
-  });
-
   it('renders feature review history', () => {
     const wrapper = mount(AIReviewSection, {
       props: {
@@ -117,22 +88,4 @@ describe('AIReviewSection', () => {
     expect(wrapper.text()).toContain('3/8');
   });
 
-  it('shows empty RFE assessment message when sourceRfe exists but no assessment', () => {
-    const wrapper = mount(AIReviewSection, {
-      props: {
-        featureReview: {
-          latest: {
-            recommendation: 'approve',
-            sourceRfe: 'RHAIRFE-999',
-            scores: { total: 6 },
-            reviewers: {}
-          },
-          history: []
-        },
-        rfeAssessment: null
-      }
-    });
-    expect(wrapper.text()).toContain('Source RFE');
-    expect(wrapper.text()).toContain('No RFE assessment data available');
-  });
 });
