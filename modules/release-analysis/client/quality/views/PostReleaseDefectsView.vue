@@ -144,7 +144,7 @@ function getLastBugDay(data) {
     }
   }
   // If count never changed (all zeros or bug on day 0), return 0
-  return finalCount > 0 ? 0 : 0;
+  return 0;
 }
 
 watch(selectedVersions, async () => {
