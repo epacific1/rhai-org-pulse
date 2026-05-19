@@ -725,7 +725,7 @@ Admin-configurable settings for the Releases module delivery domain (formerly Re
 
 ---
 
-## Release Analysis — Quality Versions (`data/release-analysis/quality/versions.json`)
+## Releases — Quality Versions (`data/releases/delivery/quality/versions.json`)
 
 All fix versions with release dates from tracked projects (RHOAIENG, AIPCC, RHAIENG, INFERENG).
 
@@ -748,7 +748,7 @@ All fix versions with release dates from tracked projects (RHOAIENG, AIPCC, RHAI
 
 ---
 
-## Release Analysis — Quality Bugs (`data/release-analysis/quality/bugs-{PROJECT}.json`)
+## Releases — Quality Bugs (`data/releases/delivery/quality/bugs-{PROJECT}.json`)
 
 Blocker/Critical/Major bugs with affected versions, per project. Only bugs created >= version release date (post-release discovery).
 
@@ -787,7 +787,7 @@ Blocker/Critical/Major bugs with affected versions, per project. Only bugs creat
 
 ---
 
-## Release Analysis — Quality Components (`data/release-analysis/quality/components.json`)
+## Releases — Quality Components (`data/releases/delivery/quality/components.json`)
 
 All unique component names from the tracked projects, sorted alphabetically.
 
