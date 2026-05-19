@@ -33,7 +33,7 @@ const { navigateTo: navigateToModule } = useModuleLink()
 const featureChartRef = ref(null)
 
 function navigateToFeature(key) {
-  if (key) navigateToModule('feature-traffic', 'feature-detail', { key })
+  if (key) navigateToModule('releases', 'feature-detail', { key })
 }
 
 function handleFeatureChartClick(event) {
