@@ -108,6 +108,9 @@ shared/
     components/     # Shared UI (Toast, LoadingOverlay, RefreshModal)
     index.js        # Barrel export
   server/
+    module-context.js  # Module contract: buildModuleContext, createTestContext (JSDoc typedefs)
+    refresh-registry.js # Ordered refresh handler registry
+    export-registry.js  # Module data export hook registry
     storage.js      # Filesystem storage abstraction
     demo-storage.js # Fixture-backed storage for demo mode
     auth.js         # Auth middleware (requireAuth, requireAdmin)
