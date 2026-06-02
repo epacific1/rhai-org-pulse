@@ -20,6 +20,7 @@ jobs:
     permissions:
       contents: read        # To checkout code
       pull-requests: write  # To post comments and read reviews
+      members: read         # To read members of the ALLOWED_APPROVER_TEAM
     env:
       # GitHub team allowed to approve AI config changes (format: org/team-slug)
       ALLOWED_APPROVER_TEAM: "red-hat-data-services/org-pulse-maintainers"
