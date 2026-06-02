@@ -245,7 +245,7 @@ export const QUALITY_REPORTS = [
     gaps:
       'No coverage tracking or enforcement, No dedicated SAST/CodeQL workflow',
     tier: 'upstream',
-    component: 'AI Hub + PyTorch',
+    component: 'AI Hub',
     team: 'AI Core Platform',
     reportUrl: reportKubeflowHub
   },
@@ -281,7 +281,7 @@ export const QUALITY_REPORTS = [
     gaps:
       'No coverage threshold enforcement, No CodeQL or SAST analysis on PRs',
     tier: 'midstream',
-    component: 'AI Hub + PyTorch',
+    component: 'AI Hub',
     team: 'AI Core Platform',
     reportUrl: reportOpendatahubIoModelRegistry
   },
@@ -365,7 +365,7 @@ export const QUALITY_REPORTS = [
     gaps:
       'No PR-time Konflux build simulation, No coverage threshold enforcement',
     tier: 'downstream',
-    component: 'AI Hub + PyTorch',
+    component: 'AI Hub',
     team: 'AI Core Platform',
     reportUrl: reportRedHatDataServicesModelRegistry
   },
@@ -389,7 +389,7 @@ export const QUALITY_REPORTS = [
     gaps:
       'No coverage tracking or enforcement, No container vulnerability scanning in CI',
     tier: 'midstream',
-    component: 'AI Hub + PyTorch',
+    component: 'AI Hub',
     team: 'AI Core Platform',
     reportUrl: reportOpendatahubIoModelRegistryOperator
   },
@@ -485,7 +485,7 @@ export const QUALITY_REPORTS = [
     gaps:
       'No coverage tracking or enforcement, No container vulnerability scanning in CI',
     tier: 'downstream',
-    component: 'AI Hub + PyTorch',
+    component: 'AI Hub',
     team: 'AI Core Platform',
     reportUrl: reportRedHatDataServicesModelRegistryOperator
   },
@@ -677,7 +677,7 @@ export const QUALITY_REPORTS = [
     gaps:
       'No CI coverage tracking or enforcement, No container image runtime validation',
     tier: 'downstream',
-    component: 'AI Hub + PyTorch',
+    component: 'AI Hub',
     team: 'AI Core Platform',
     reportUrl: reportRedHatDataServicesModelMetadataCollection
   },
@@ -796,7 +796,7 @@ export const QUALITY_REPORTS = [
     gaps:
       'No container vulnerability scanning, No coverage enforcement thresholds',
     tier: 'downstream',
-    component: 'AI Hub + PyTorch',
+    component: 'AI Hub',
     team: 'AI Core Platform',
     reportUrl: reportRedHatDataServicesModelRegistryBf4Kf
   },
@@ -832,7 +832,7 @@ export const QUALITY_REPORTS = [
     gaps:
       'No coverage enforcement in CI, No security scanning (Trivy, CodeQL, gosec, Dependabot)',
     tier: 'midstream',
-    component: 'AI Hub + PyTorch',
+    component: 'AI Hub',
     team: 'AI Core Platform',
     reportUrl: reportOpendatahubIoModelMetadataCollection
   },
@@ -880,7 +880,7 @@ export const QUALITY_REPORTS = [
     gaps:
       'No security scanning (Trivy, CodeQL, Snyk, SAST), Very low Go unit test coverage (4 test files for 89 source files)',
     tier: 'midstream',
-    component: 'AI Hub + PyTorch',
+    component: 'AI Hub',
     team: 'AI Core Platform',
     reportUrl: reportOpendatahubIoModelRegistryBf4Kf
   },
