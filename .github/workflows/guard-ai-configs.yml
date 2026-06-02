@@ -112,6 +112,8 @@ jobs:
 
           APPROVED=false
           while IFS= read -r approver; do
+            # Skip empty lines (edge case when no approvals exist)
+            [ -z "$approver" ] && continue
             if echo "$TEAM_MEMBERS" | grep -qx "$approver"; then
               echo "✅ Approved by @$approver (member of ${ALLOWED_APPROVER_TEAM}). This PR can be merged to main."
               APPROVED=true
