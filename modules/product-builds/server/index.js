@@ -413,10 +413,16 @@ module.exports = function registerRoutes(router, context) {
 
   // --- Package Analysis ---
 
-  const jira = createJiraClient({
-    email: (context.secrets && context.secrets.JIRA_EMAIL) || '',
-    token: (context.secrets && context.secrets.JIRA_TOKEN) || '',
-  });
+  let _jira;
+  function getJira() {
+    if (!_jira) {
+      _jira = createJiraClient({
+        email: (context.secrets && context.secrets.JIRA_EMAIL) || '',
+        token: (context.secrets && context.secrets.JIRA_TOKEN) || '',
+      });
+    }
+    return _jira;
+  }
 
   function rebuildPackageIndex() {
     const files = storage.listStorageFiles(PKG_STORAGE_PREFIX + '/');
@@ -437,7 +443,7 @@ module.exports = function registerRoutes(router, context) {
   }
 
   async function generatePackageReport(reportDate) {
-    const report = await buildReport(jira, { reportDate });
+    const report = await buildReport(getJira(), { reportDate });
     writeToStorage(`${PKG_STORAGE_PREFIX}/${report.report_date}.json`, report);
     const index = rebuildPackageIndex();
     writeToStorage(PKG_INDEX_PATH, index);
@@ -505,11 +511,11 @@ module.exports = function registerRoutes(router, context) {
   router.get('/package-reports/onboarded', async function(req, res) {
     const days = Math.min(Math.max(parseInt(req.query.days, 10) || 7, 1), 90);
     try {
-      const epics = await getPackagesOnboarded(jira, days);
+      const epics = await getPackagesOnboarded(getJira(), days);
       res.json({ days, count: epics.length, epics });
     } catch (err) {
       console.error('[package-analysis] Onboarded query failed:', err.message);
-      res.status(500).json({ error: 'Failed to fetch onboarded packages', detail: err.message });
+      res.status(500).json({ error: 'Failed to fetch onboarded packages' });
     }
   });
 
@@ -534,9 +540,13 @@ module.exports = function registerRoutes(router, context) {
    *         description: No report for the specified date
    */
   router.get('/package-reports/:date', function(req, res) {
-    const report = readFromStorage(`${PKG_STORAGE_PREFIX}/${req.params.date}.json`);
+    const date = req.params.date;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({ error: 'Invalid date format, expected YYYY-MM-DD' });
+    }
+    const report = readFromStorage(`${PKG_STORAGE_PREFIX}/${date}.json`);
     if (!report) {
-      return res.status(404).json({ error: `No report for ${req.params.date}` });
+      return res.status(404).json({ error: `No report for ${date}` });
     }
     res.json(report);
   });
@@ -559,7 +569,7 @@ module.exports = function registerRoutes(router, context) {
       res.json(report);
     } catch (err) {
       console.error('[package-analysis] Generation failed:', err.message);
-      res.status(500).json({ error: 'Report generation failed', detail: err.message });
+      res.status(500).json({ error: 'Report generation failed' });
     }
   });
 
@@ -568,7 +578,12 @@ module.exports = function registerRoutes(router, context) {
     timeout: 600000,
     handler: async function() {
       if (DEMO_MODE) return;
-      await generatePackageReport();
+      const now = new Date();
+      if (now.getUTCHours() < 6) return;
+      const today = now.toISOString().slice(0, 10);
+      const existing = readFromStorage(`${PKG_STORAGE_PREFIX}/${today}.json`);
+      if (existing) return;
+      await generatePackageReport(today);
     },
   });
 
@@ -582,25 +597,6 @@ module.exports = function registerRoutes(router, context) {
     };
   });
 
-  if (!DEMO_MODE) {
-    const DAILY_INTERVAL = 24 * 60 * 60 * 1000;
-    setTimeout(() => {
-      const timer = setInterval(async () => {
-        const today = new Date().toISOString().slice(0, 10);
-        const existing = readFromStorage(`${PKG_STORAGE_PREFIX}/${today}.json`);
-        if (existing) return;
-        console.log('[package-analysis] Daily scheduled generation starting...');
-        try {
-          await generatePackageReport(today);
-          console.log('[package-analysis] Daily report generated for %s', today);
-        } catch (err) {
-          console.error('[package-analysis] Daily generation failed:', err.message);
-        }
-      }, DAILY_INTERVAL);
-      timer.unref();
-      console.log('[package-analysis] Daily schedule active (24h interval)');
-    }, 30000);
-  }
 };
 
 module.exports.getConfig = getConfig;

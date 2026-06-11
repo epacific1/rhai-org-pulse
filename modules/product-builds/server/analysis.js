@@ -1,5 +1,6 @@
 const INACTIVE_THRESHOLD_DAYS = 5
 const CRITICAL_THRESHOLD_DAYS = 30
+const CONCURRENCY = 5
 
 const OPEN_EPICS_JQL =
   'project = AIPCC AND issuetype = Epic ' +
@@ -213,7 +214,6 @@ async function buildReport(jira, options = {}) {
 
   console.log('[package-analysis] Fetching children and comments for %d EPICs...', rawEpics.length)
 
-  const CONCURRENCY = 5
   const epics = []
   for (let i = 0; i < rawEpics.length; i += CONCURRENCY) {
     const batch = rawEpics.slice(i, i + CONCURRENCY)
