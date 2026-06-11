@@ -5,21 +5,18 @@ import { useReleaseHealth } from '../composables/useReleaseHealth'
 import { useBigRockEditor } from '../composables/useBigRockEditor'
 import { useFilters } from '../composables/useFilters'
 import { useHealthAggregation } from '../composables/useHealthAggregation'
-import { useReleaseDistribution } from '../composables/useReleaseDistribution'
 import { useRefreshPolling } from '../composables/useRefreshPolling'
 import { useClickOutside } from '../composables/useClickOutside'
 import { exportMarkdown as exportMd, exportCsv as exportCsvFile } from '../utils/outcomes-export'
 import { formatDate } from '@shared/client'
-import SummaryCards from '../components/SummaryCards.vue'
 import BigRocksTable from '../components/BigRocksTable.vue'
 import BigRockEditPanel from '../components/BigRockEditPanel.vue'
 import BigRockDeleteDialog from '../components/BigRockDeleteDialog.vue'
 import NewReleaseDialog from '../components/NewReleaseDialog.vue'
-import FeaturesTable from '../components/FeaturesTable.vue'
-import RfesTable from '../components/RfesTable.vue'
 import FilterBar from '../components/FilterBar.vue'
 import ReleaseSelector from '../components/ReleaseSelector.vue'
 import RecentActivity from '../components/RecentActivity.vue'
+import Toast from '@shared/client/components/Toast.vue'
 
 const {
   candidates, loading, error, refreshing, cacheStale, permissions,
@@ -35,7 +32,8 @@ const { healthData, healthLoading, loadHealth } = useReleaseHealth()
 const {
   formData, editingRock, isNewRock,
   openForEdit, openForNew, close: closeEditPanel,
-  setSaving, setSaveError, setFieldErrors
+  setSaving, setSaveError, setFieldErrors,
+  loadPillarOptions
 } = useBigRockEditor()
 
 const selectedVersion = ref('')
@@ -52,6 +50,11 @@ const newReleaseDialogOpen = ref(false)
 // Seed state
 const seeding = ref(false)
 
+// Toast state
+const toastMessage = ref('')
+const toastType = ref('success')
+const showToast = ref(false)
+
 // Refresh polling -- composable handles watch + cleanup
 useRefreshPolling(refreshing, checkRefreshStatus, function() {
   if (selectedVersion.value) {
@@ -62,20 +65,17 @@ useRefreshPolling(refreshing, checkRefreshStatus, function() {
 const features = computed(() => candidates.value ? candidates.value.features || [] : [])
 const rfes = computed(() => candidates.value ? candidates.value.rfes || [] : [])
 const bigRocks = computed(() => candidates.value ? candidates.value.bigRocks || [] : [])
-const summary = computed(() => candidates.value ? candidates.value.summary : null)
 const filterOptions = computed(() => candidates.value ? candidates.value.filterOptions || {} : {})
 const jiraBaseUrl = computed(() => candidates.value ? candidates.value.jiraBaseUrl || '' : '')
 const demoMode = computed(() => candidates.value ? candidates.value.demoMode : false)
 
 const {
-  healthByKey,
-  rfeKeyToHealth,
   rockHealth,
   rockFeatures,
-  tier1HealthSummary
+  planningReadiness,
+  releasePhaseMode
 } = useHealthAggregation(healthData, features, rfes, bigRocks)
-
-const { releaseDistribution } = useReleaseDistribution(features)
+const healthMilestones = computed(() => healthData.value ? healthData.value.milestones : null)
 const warning = computed(() => candidates.value ? candidates.value.warning : null)
 const pipelineWarnings = computed(() => candidates.value ? candidates.value.pipelineWarnings || [] : [])
 const canEdit = computed(() => !demoMode.value && permissions.value && permissions.value.canEdit)
@@ -96,23 +96,6 @@ const {
 
 const moduleNav = inject('moduleNav', null)
 
-const tabs = [
-  { id: 'big-rocks', label: 'Big Rocks' },
-  { id: 'features', label: 'Features' },
-  { id: 'rfes', label: 'RFEs' }
-]
-
-const featureCount = computed(() => filteredFeatures.value.length)
-const rfeCount = computed(() => filteredRfes.value.length)
-const bigRockCount = computed(() => filteredBigRocks.value.length)
-
-function tabCount(tabId) {
-  if (tabId === 'features') return featureCount.value
-  if (tabId === 'rfes') return rfeCount.value
-  if (tabId === 'big-rocks') return bigRockCount.value
-  return 0
-}
-
 const exportMenuOpen = ref(false)
 
 function closeExportMenu() {
@@ -129,7 +112,8 @@ function getExportData() {
     selectedVersion: selectedVersion.value,
     bigRocks: filteredBigRocks.value,
     filteredFeatures: filteredFeatures.value,
-    filteredRfes: filteredRfes.value
+    filteredRfes: filteredRfes.value,
+    rockHealth: rockHealth.value
   }
 }
 
@@ -172,6 +156,14 @@ async function handleSave() {
     if (result.bigRocks) {
       updateBigRocksInPlace(result.bigRocks)
     }
+
+    // Show toast for rename
+    if (!isNewRock.value && editingRock.value && formData.value.name !== editingRock.value.name) {
+      toastMessage.value = 'Rock renamed. Health data is refreshing and will appear shortly.'
+      toastType.value = 'success'
+      showToast.value = true
+    }
+
     closeEditPanel()
   } catch (err) {
     if (err.status === 400 && err.data && err.data.fields) {
@@ -287,10 +279,6 @@ watch(selectedVersion, function(newVersion) {
   }
 })
 
-watch(activeTab, function() {
-  error.value = null
-})
-
 // Close export menu on outside click (composable handles mount/unmount)
 useClickOutside(null, function() {
   exportMenuOpen.value = false
@@ -298,6 +286,7 @@ useClickOutside(null, function() {
 
 onMounted(async function() {
   loadPermissions()
+  loadPillarOptions()
   await loadReleases()
   if (releases.value.length > 0) {
     selectedVersion.value = releases.value[0].version
@@ -306,7 +295,6 @@ onMounted(async function() {
     var p = moduleNav.params.value
     if (p.bigRock) {
       selectedRock.value = p.bigRock
-      activeTab.value = 'features'
     }
   }
 })
@@ -317,7 +305,7 @@ onMounted(async function() {
     <!-- Header -->
     <div class="flex items-center justify-between flex-wrap gap-4">
       <div>
-        <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">Outcomes Dashboard</h1>
+        <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">Big Rocks Dashboard</h1>
         <p v-if="candidates && candidates.lastRefreshed" class="text-sm text-gray-500 dark:text-gray-400 mt-1">
           Data from {{ formatDate(candidates.lastRefreshed) }}
         </p>
@@ -377,90 +365,53 @@ onMounted(async function() {
     </div>
 
     <template v-if="candidates">
-      <!-- Summary -->
-      <SummaryCards :summary="summary" :tier1HealthSummary="tier1HealthSummary" :releaseDistribution="releaseDistribution" />
+      <FilterBar
+        :filterOptions="filterOptions"
+        :activeTab="activeTab"
+        v-model:selectedPillar="selectedPillar"
+        v-model:selectedRock="selectedRock"
+        v-model:selectedStatus="selectedStatus"
+        v-model:selectedPriority="selectedPriority"
+        v-model:selectedTeams="selectedTeams"
+        v-model:searchQuery="searchQuery"
+        :hasActiveFilters="hasActiveFilters"
+        @clearFilters="clearFilters"
+      />
 
-      <!-- Tabs -->
-      <div>
-        <div class="flex items-center justify-between border-b border-gray-200 dark:border-gray-700">
-          <div role="tablist" aria-label="Release planning views" class="flex items-center gap-0 -mb-px">
-            <button
-              v-for="tab in tabs"
-              :key="tab.id"
-              role="tab"
-              :id="'tab-' + tab.id"
-              :aria-selected="activeTab === tab.id"
-              :aria-controls="'panel-' + tab.id"
-              :tabindex="activeTab === tab.id ? 0 : -1"
-              @click="activeTab = tab.id"
-              class="px-4 py-2.5 text-xs font-medium transition-colors flex items-center gap-1.5 border-b-2"
-              :class="activeTab === tab.id
-                ? 'border-primary-600 dark:border-primary-400 text-primary-700 dark:text-primary-400'
-                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'"
-            >
-              {{ tab.label }}
-              <span
-                class="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-semibold"
-                :class="activeTab === tab.id
-                  ? 'bg-primary-100 dark:bg-primary-500/20 text-primary-700 dark:text-primary-400'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'"
-              >{{ tabCount(tab.id) }}</span>
-            </button>
-          </div>
-          <div class="relative pb-2 pl-3 ml-3 border-l border-gray-200 dark:border-gray-700" @click.stop @keydown.escape="closeExportMenu">
-            <button
-              @click="toggleExportMenu"
-              :aria-expanded="exportMenuOpen"
-              aria-haspopup="menu"
-              aria-label="Export data"
-              class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-            >
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+      <!-- Planning readiness banner (inline, not via SummaryCards.vue) -->
+      <div v-if="releasePhaseMode === 'planning' && planningReadiness" class="bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/30 border-l-4 border-l-indigo-500 dark:border-l-indigo-400 rounded-lg px-4 py-3">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <div class="flex items-center gap-2 text-sm font-semibold text-indigo-700 dark:text-indigo-400">
+              <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
               </svg>
-              Export
-              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-            <div
-              v-if="exportMenuOpen"
-              role="menu"
-              class="absolute right-0 mt-1 w-40 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-600 py-1 z-10"
-            >
-              <button
-                role="menuitem"
-                @click="handleExportMarkdown"
-                class="w-full text-left px-3 py-1.5 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-              >Markdown (.md)</button>
-              <button
-                role="menuitem"
-                @click="exportCsv"
-                class="w-full text-left px-3 py-1.5 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-              >CSV (.csv)</button>
+              Planning Phase
+              <span v-if="healthMilestones && healthMilestones.gaFreeze" class="font-normal text-indigo-600/70 dark:text-indigo-400/70">
+                &mdash; GA Code Freeze: {{ healthMilestones.gaFreeze }}
+              </span>
+            </div>
+            <div class="text-xs text-indigo-600/70 dark:text-indigo-400/70 mt-0.5 ml-6">
+              {{ planningReadiness.totalChecked }} features checked
             </div>
           </div>
-        </div>
-
-        <!-- Filters -->
-        <div class="pt-3">
-          <FilterBar
-            :filterOptions="filterOptions"
-            :activeTab="activeTab"
-            v-model:selectedPillar="selectedPillar"
-            v-model:selectedRock="selectedRock"
-            v-model:selectedStatus="selectedStatus"
-            v-model:selectedPriority="selectedPriority"
-            v-model:selectedTeams="selectedTeams"
-            v-model:searchQuery="searchQuery"
-            :hasActiveFilters="hasActiveFilters"
-            @clearFilters="clearFilters"
-          />
+          <div class="flex items-center gap-4 text-sm">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-green-500"></span>
+              <span class="text-gray-700 dark:text-gray-300 font-medium">{{ planningReadiness.fullyReady }}</span>
+              <span class="text-gray-500 dark:text-gray-400 text-xs">ready</span>
+            </div>
+            <div v-if="planningReadiness.withHardBlockers > 0" class="flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-red-500"></span>
+              <span class="text-gray-700 dark:text-gray-300 font-medium">{{ planningReadiness.withHardBlockers }}</span>
+              <span class="text-gray-500 dark:text-gray-400 text-xs">blockers</span>
+            </div>
+          </div>
         </div>
       </div>
 
       <!-- Tab content -->
-      <div v-if="activeTab === 'big-rocks'" id="panel-big-rocks" role="tabpanel" aria-labelledby="tab-big-rocks">
+      <div v-if="activeTab === 'big-rocks'">
         <BigRocksTable
           :bigRocks="filteredBigRocks"
           :jiraBaseUrl="jiraBaseUrl"
@@ -469,28 +420,16 @@ onMounted(async function() {
           :rockFeatures="rockFeatures"
           :loading="loading"
           :healthLoading="healthLoading"
+          :releasePhaseMode="releasePhaseMode"
+          :exportMenuOpen="exportMenuOpen"
           @editRock="handleEditRock"
           @addRock="handleAddRock"
           @deleteRock="handleDeleteRock"
           @reorder="handleReorder"
-        />
-      </div>
-      <div v-if="activeTab === 'features'" id="panel-features" role="tabpanel" aria-labelledby="tab-features">
-        <FeaturesTable
-          :features="filteredFeatures"
-          :bigRocks="bigRocks"
-          :jiraBaseUrl="jiraBaseUrl"
-          :summary="summary"
-          :healthByKey="healthByKey"
-        />
-      </div>
-      <div v-if="activeTab === 'rfes'" id="panel-rfes" role="tabpanel" aria-labelledby="tab-rfes">
-        <RfesTable
-          :rfes="filteredRfes"
-          :bigRocks="bigRocks"
-          :jiraBaseUrl="jiraBaseUrl"
-          :summary="summary"
-          :rfeKeyToHealth="rfeKeyToHealth"
+          @toggleExport="toggleExportMenu"
+          @closeExport="closeExportMenu"
+          @exportMarkdown="handleExportMarkdown"
+          @exportCsv="exportCsv"
         />
       </div>
 
@@ -544,5 +483,12 @@ onMounted(async function() {
       @close="newReleaseDialogOpen = false"
     />
 
+    <!-- Toast notification -->
+    <Toast
+      v-if="showToast"
+      :message="toastMessage"
+      :type="toastType"
+      @close="showToast = false"
+    />
   </div>
 </template>

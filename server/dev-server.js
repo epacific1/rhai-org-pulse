@@ -233,7 +233,7 @@ const roleStore = createRoleStore(readFromStorage, writeToStorage, {
   },
   roleRegistry
 });
-const { authMiddleware, requireAdmin, requireTeamAdmin, requireRole, requireScope, seedRoles } = createAuthMiddleware(readFromStorage, writeToStorage, {
+const { authMiddleware, requireAuth, requireAdmin, requireTeamAdmin, requireRole, requireScope, seedRoles } = createAuthMiddleware(readFromStorage, writeToStorage, {
   tokenValidator: apiTokens,
   roleStore
 });
@@ -825,6 +825,42 @@ app.post('/api/admin/refresh/:module', requireAdmin, requireScope('admin:manage'
     console.error('[refresh-module] runModule error for %s:', slug, err.message);
   });
   res.status(202).json({ status: 'started', module: slug });
+});
+
+/**
+ * @openapi
+ * /api/admin/refresh/handler/{handlerId}:
+ *   post:
+ *     tags: [Admin]
+ *     summary: Run a single refresh handler by ID (admin only)
+ *     parameters:
+ *       - in: path
+ *         name: handlerId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Full handler ID (e.g. "team-tracker:roster-sync")
+ *     responses:
+ *       202:
+ *         description: Handler started
+ *       404:
+ *         description: Handler not found
+ *       409:
+ *         description: Refresh already in progress
+ */
+app.post('/api/admin/refresh/handler/:handlerId', requireAdmin, requireScope('admin:manage'), function(req, res) {
+  if (refreshRegistry.isRunning()) {
+    return res.status(409).json({ error: 'Refresh is already running' });
+  }
+  const handlerId = req.params.handlerId;
+  const handler = refreshRegistry.get(handlerId);
+  if (!handler) {
+    return res.status(404).json({ error: 'No handler registered with id "' + handlerId + '"' });
+  }
+  refreshRegistry.runOne(handlerId, { skipCooldown: true }).catch(function(err) {
+    console.error('[refresh-handler] runOne error for %s:', handlerId, err.message);
+  });
+  res.status(202).json({ status: 'started', handler: handlerId });
 });
 
 /**
@@ -1562,6 +1598,7 @@ refreshRegistry.register('platform:backup', {
   order: 200,
   cadence: '24h',
   timeout: 120000,
+  description: 'Creates a backup of all data files to S3 and applies retention policy.',
   handler: async function() {
     if (!process.env.AWS_BACKUP_BUCKET) {
       return { status: 'skipped', reason: 'AWS_BACKUP_BUCKET not configured' };
@@ -1635,6 +1672,78 @@ if (startupStateChanged) {
 const effectiveState = getEffectiveState(builtInModules, startupState);
 reconcileStartupState(builtInModules, effectiveState, storageModule);
 const enabledSlugs = new Set(Object.entries(effectiveState).filter(([, v]) => v).map(([k]) => k));
+
+// ─── One-time migration: AI Impact features → unified releases store ───
+// Runs BEFORE module routers to prevent race conditions.
+// Idempotent — safe to re-run if flag file is missing after PVC restore.
+(function migrateAiFeaturesToUnifiedStore() {
+  const FLAG_KEY = 'migrations/ai-features-unified';
+  if (storageModule.readFromStorage(FLAG_KEY)) return;
+
+  const legacyData = storageModule.readFromStorage('ai-impact/features.json');
+  if (!legacyData || !legacyData.features || Object.keys(legacyData.features).length === 0) {
+    // No legacy data to migrate — set flag and return
+    storageModule.writeToStorage(FLAG_KEY, { migratedAt: new Date().toISOString(), count: 0 });
+    return;
+  }
+
+  console.log('[migration] Migrating AI Impact features to unified releases store...');
+  const keys = Object.keys(legacyData.features);
+  let migrated = 0;
+
+  for (const key of keys) {
+    const entry = legacyData.features[key];
+    if (!entry || !entry.latest) continue;
+
+    const featurePath = 'releases/execution/features/' + key + '.json';
+    const existing = storageModule.readFromStorage(featurePath);
+
+    if (existing && existing.aiReview) {
+      // Already has aiReview — skip
+      continue;
+    }
+
+    const aiReview = {
+      ...entry.latest,
+      history: entry.history || []
+    };
+    // Remove fields that belong at the feature level, not aiReview
+    delete aiReview.key;
+
+    if (existing) {
+      // Merge aiReview into existing feature file
+      existing.aiReview = aiReview;
+      storageModule.writeToStorage(featurePath, existing);
+    } else {
+      // Create minimal stub — jira-enrichment will populate Jira fields later
+      storageModule.writeToStorage(featurePath, {
+        key,
+        summary: entry.latest.title || '',
+        aiReview,
+        _sources: { aiReview: new Date().toISOString() }
+      });
+    }
+    migrated++;
+  }
+
+  // Rebuild index after migration
+  // rebuildIndex is synchronous (reads feature files + writes index.json) — safe to call without await
+  if (migrated > 0) {
+    try {
+      const { rebuildIndex } = require('../modules/releases/server/execution/feature-store');
+      rebuildIndex(storageModule);
+      console.log(`[migration] Migrated ${migrated} AI Impact features, index rebuilt.`);
+    } catch (err) {
+      console.log(`[migration] Migrated ${migrated} AI Impact features (index rebuild deferred to next refresh): ${err.message}`);
+    }
+  }
+
+  storageModule.writeToStorage(FLAG_KEY, {
+    migratedAt: new Date().toISOString(),
+    count: migrated,
+    totalLegacy: keys.length
+  });
+})();
 
 const moduleRouters = createModuleRouters(builtInModules, coreServices, enabledSlugs, registries);
 
@@ -2079,7 +2188,7 @@ function exportRateLimit(req, res, next) {
  *       500:
  *         $ref: '#/components/responses/ServerError'
  */
-app.get('/api/export/test-data', requireAdmin, requireScope('admin:manage'), exportRateLimit, function(req, res) {
+app.get('/api/export/test-data', requireAuth, exportRateLimit, function(req, res) {
   handleExport(req, res, storageModule, exportRegistry);
 });
 

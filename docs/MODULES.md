@@ -313,9 +313,9 @@ The CronJob (`deploy/openshift/base/cronjob-sync-refresh.yaml`, every 15 minutes
 
 ## Export Hook
 
-Modules can participate in the anonymized test data export by registering an export hook via `context.registerExport(fn)` and optionally declaring exported files in `module.json`.
+Modules that persist data via `writeToStorage` or `writeToStorageAtomic` **must** register an export hook via `context.registerExport(fn)` and declare exported files in `module.json`. This ensures all module data is included in the anonymized test data export (used for demo mode and testing). CI validation (`npm run validate:modules`) enforces this — modules that write to storage without an `export` section in `module.json` will fail the build.
 
-### module.json (optional)
+### module.json
 
 ```json
 {
@@ -492,6 +492,7 @@ module.exports = function registerRoutes(router, context) {
       order: 50,           // lower runs first (default: 100)
       timeout: 300000,     // per-handler timeout in ms (default: 5 min)
       cadence: '12h',      // how often to run (default: '24h')
+      description: 'Fetches external data and stores it locally.',
       handler: async function(options) {
         // Fetch and store data
         const data = await fetchExternalData()
@@ -511,6 +512,7 @@ module.exports = function registerRoutes(router, context) {
 | `order` | number | 100 | Execution order — lower runs first. Handlers at the same order run in parallel |
 | `timeout` | number | 300000 | Per-handler timeout in ms |
 | `cadence` | string | `'24h'` | How often the handler should run. Formats: `'15m'`, `'12h'`, `'1d'` |
+| `description` | string | null | Human-readable description shown in the admin Settings UI |
 | `status` | function | null | Async function returning current status (legacy, used when no runs have occurred) |
 
 ### Cadence
@@ -652,3 +654,4 @@ The `org-pulse/no-module-process-env` ESLint rule prevents `process.env` access 
 - [ ] `npm test` passes
 - [ ] CODEOWNERS entry added
 - [ ] No imports from other modules (only `@shared`)
+- [ ] If module persists data (`writeToStorage`): export hook registered and `export.files` declared in `module.json`

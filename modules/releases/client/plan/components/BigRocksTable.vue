@@ -10,14 +10,16 @@ const props = defineProps({
   rockHealth: { type: Object, default: () => ({}) },
   rockFeatures: { type: Object, default: () => ({}) },
   loading: { type: Boolean, default: false },
-  healthLoading: { type: Boolean, default: false }
+  healthLoading: { type: Boolean, default: false },
+  releasePhaseMode: { type: String, default: 'unknown' },
+  exportMenuOpen: { type: Boolean, default: false }
 })
 
 const hasHealth = computed(function() {
   return Object.keys(props.rockHealth).length > 0
 })
 
-const emit = defineEmits(['editRock', 'addRock', 'deleteRock', 'reorder'])
+const emit = defineEmits(['editRock', 'addRock', 'deleteRock', 'reorder', 'toggleExport', 'closeExport', 'exportMarkdown', 'exportCsv'])
 
 // Expansion state — plain object for reliable Vue reactivity
 var expandedRocks = reactive({})
@@ -128,18 +130,59 @@ function handleDeleteClick(event, rock) {
 
 <template>
   <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-600 overflow-hidden">
-    <!-- Toolbar -->
-    <div v-if="canEdit" class="flex items-center justify-between px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30">
-      <span class="text-xs text-gray-500 dark:text-gray-400">Drag to reorder.</span>
-      <button
-        @click="emit('addRock')"
-        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-primary-600 text-white hover:bg-primary-700"
-      >
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-        </svg>
-        Add Big Rock
-      </button>
+    <!-- Toolbar (always visible) -->
+    <div class="flex items-center justify-between px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30">
+      <span v-if="canEdit" class="text-xs text-gray-500 dark:text-gray-400">Drag to reorder.</span>
+      <span v-else></span>
+
+      <div class="flex items-center gap-2">
+        <!-- Export dropdown -->
+        <div class="relative" @click.stop @keydown.escape="emit('closeExport')">
+          <button
+            @click="emit('toggleExport')"
+            :aria-expanded="exportMenuOpen"
+            aria-haspopup="menu"
+            aria-label="Export data"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Export
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          <div
+            v-if="exportMenuOpen"
+            role="menu"
+            class="absolute right-0 mt-1 w-40 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-600 py-1 z-10"
+          >
+            <button
+              role="menuitem"
+              @click="emit('exportMarkdown')"
+              class="w-full text-left px-3 py-1.5 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+            >Markdown (.md)</button>
+            <button
+              role="menuitem"
+              @click="emit('exportCsv')"
+              class="w-full text-left px-3 py-1.5 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+            >CSV (.csv)</button>
+          </div>
+        </div>
+
+        <!-- Add Big Rock (edit mode only) -->
+        <button
+          v-if="canEdit"
+          @click="emit('addRock')"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-primary-600 text-white hover:bg-primary-700"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+          </svg>
+          Add Big Rock
+        </button>
+      </div>
     </div>
 
     <div class="overflow-x-auto">
@@ -152,8 +195,10 @@ function handleDeleteClick(event, rock) {
             <th scope="col" class="px-3 py-2 text-left text-gray-700 dark:text-gray-200 font-semibold uppercase text-xs tracking-wide border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-900/80">Pillar</th>
             <th scope="col" class="px-3 py-2 text-left text-gray-700 dark:text-gray-200 font-semibold uppercase text-xs tracking-wide border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-900/80">Big Rock</th>
             <th scope="col" class="px-3 py-2 text-left text-gray-700 dark:text-gray-200 font-semibold uppercase text-xs tracking-wide border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-900/80">Outcome(s)</th>
+            <th v-if="hasHealth" scope="col" class="px-3 py-2 text-center text-gray-700 dark:text-gray-200 font-semibold uppercase text-xs tracking-wide border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-900/80">Release Type</th>
             <th v-if="hasHealth" scope="col" class="px-3 py-2 text-center text-gray-700 dark:text-gray-200 font-semibold uppercase text-xs tracking-wide border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-900/80">Health</th>
             <th scope="col" class="px-3 py-2 text-left text-gray-700 dark:text-gray-200 font-semibold uppercase text-xs tracking-wide border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-900/80">Owners</th>
+            <th v-if="hasHealth" scope="col" class="px-3 py-2 text-center text-gray-700 dark:text-gray-200 font-semibold uppercase text-xs tracking-wide border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-900/80">Versions</th>
             <th scope="col" class="px-3 py-2 text-center text-gray-700 dark:text-gray-200 font-semibold uppercase text-xs tracking-wide border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-900/80">Features / RFEs</th>
             <th v-if="canEdit" scope="col" class="px-2 py-2 w-8 border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-900/80"><span class="sr-only">Actions</span></th>
           </tr>
@@ -178,7 +223,7 @@ function handleDeleteClick(event, rock) {
                   &#x2807;
                 </span>
               </td>
-              <BigRockRow :rock="rock" :jiraBaseUrl="jiraBaseUrl" :health="rockHealth[rock.name]" :hasHealth="hasHealth" :rockFeatures="rockFeatures[rock.name] || []" :canEdit="true" :expanded="isExpanded(rock.name)" @toggle-expand="toggleExpand(rock.name)" />
+              <BigRockRow :rock="rock" :jiraBaseUrl="jiraBaseUrl" :health="rockHealth[rock.name]" :hasHealth="hasHealth" :rockFeatures="rockFeatures[rock.name] || []" :canEdit="true" :expanded="isExpanded(rock.name)" :releasePhaseMode="releasePhaseMode" @toggle-expand="toggleExpand(rock.name)" />
               <td class="px-2 py-2 text-center border border-gray-300 dark:border-gray-600">
                 <div class="flex items-center justify-center gap-1">
                   <button
@@ -205,9 +250,10 @@ function handleDeleteClick(event, rock) {
             <tr v-if="isExpanded(rock.name)" :key="rock.name + '-edit-expanded'" @dragover.prevent>
               <BigRockExpandedRow
                 :features="rockFeatures[rock.name] || []"
-                :colspan="hasHealth ? 9 : 8"
+                :colspan="hasHealth ? 11 : 8"
                 :loading="healthLoading"
                 :rockName="rock.name"
+                :releasePhaseMode="releasePhaseMode"
               />
             </tr>
           </template>
@@ -216,7 +262,7 @@ function handleDeleteClick(event, rock) {
           <!-- Skeleton loading rows -->
           <template v-if="loading">
             <tr v-for="n in 3" :key="'skeleton-' + n">
-              <td :colspan="hasHealth ? 7 : 6" class="px-3 py-4 border border-gray-300 dark:border-gray-600">
+              <td :colspan="hasHealth ? 9 : 6" class="px-3 py-4 border border-gray-300 dark:border-gray-600">
                 <div class="animate-pulse flex items-center gap-4">
                   <div class="h-4 w-8 bg-gray-200 dark:bg-gray-700 rounded" />
                   <div class="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded" />
@@ -239,22 +285,24 @@ function handleDeleteClick(event, rock) {
                   :rockFeatures="rockFeatures[rock.name] || []"
                   :canEdit="false"
                   :expanded="isExpanded(rock.name)"
+                  :releasePhaseMode="releasePhaseMode"
                   @toggle-expand="toggleExpand(rock.name)"
                 />
               </tr>
               <tr v-if="isExpanded(rock.name)" :key="rock.name + '-expanded'">
                 <BigRockExpandedRow
                   :features="rockFeatures[rock.name] || []"
-                  :colspan="hasHealth ? 7 : 6"
+                  :colspan="hasHealth ? 9 : 6"
                   :loading="healthLoading"
                   :rockName="rock.name"
+                  :releasePhaseMode="releasePhaseMode"
                 />
               </tr>
             </template>
           </template>
           <!-- Empty state -->
           <tr v-else>
-            <td :colspan="hasHealth ? 7 : 6" class="px-3 py-8 text-center text-gray-500 border border-gray-300 dark:border-gray-600">
+            <td :colspan="hasHealth ? 9 : 6" class="px-3 py-8 text-center text-gray-500 border border-gray-300 dark:border-gray-600">
               No Big Rocks configured.
             </td>
           </tr>

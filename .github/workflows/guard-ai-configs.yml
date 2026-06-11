@@ -1,8 +1,18 @@
 # Prevents unauthorized changes to AI agent configs (AGENTS.md, .claude/, etc.)
 # and this workflow file itself. Uses the commit status API so that multiple
-# workflow runs (pull_request + pull_request_review) update a single status
-# rather than creating separate check runs. Add "AI Config Guard" as a required
-# status check in branch protection to enforce.
+# workflow runs (pull_request_target + pull_request_review) update a single
+# status rather than creating separate check runs. Add "AI Config Guard" as a
+# required status check in branch protection to enforce.
+#
+# Uses pull_request_target (not pull_request) so that fork PRs get a write
+# GITHUB_TOKEN and access to secrets. This is safe because the workflow never
+# executes code from the PR — it only inspects file paths via the GitHub API.
+# GitHub enforces that pull_request_target always runs the workflow file from
+# the default branch, so a fork cannot modify these steps.
+#
+# Trade-off: changes to THIS workflow file cannot be tested in a PR — the
+# version on main always runs. This is an acceptable security posture for a
+# guard workflow.
 
 name: Guard AI Configurations
 
@@ -11,17 +21,39 @@ on:
     types:
       - submitted  # Re-evaluate when a reviewer approves
       - dismissed  # Re-evaluate when an approval is dismissed
-  pull_request:
+  pull_request_target:
     types:
       - opened
       - synchronize
       - reopened
+  merge_group:
 
 jobs:
-  check-ai-configs:
+  # Merge queue no-op: the real guard check already ran on the PR. The queue
+  # just needs the "AI Config Guard" commit status to exist and pass.
+  merge-queue-pass:
+    if: github.event_name == 'merge_group'
     runs-on: ubuntu-latest
     permissions:
-      contents: read        # To checkout code
+      statuses: write
+    env:
+      STATUS_CONTEXT: "AI Config Guard"
+    steps:
+      - name: Set success status for merge queue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_SHA: ${{ github.event.merge_group.head_sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh api "repos/${REPO}/statuses/${HEAD_SHA}" \
+            -f state=success \
+            -f context="${STATUS_CONTEXT}" \
+            -f description="Merge queue — already verified on PR"
+
+  check-ai-configs:
+    if: github.event_name != 'merge_group'
+    runs-on: ubuntu-latest
+    permissions:
       pull-requests: write  # To post comments and read reviews
       statuses: write       # To set commit status via the API
     env:
@@ -32,42 +64,39 @@ jobs:
       SENSITIVE_FILES: ".claude/ AGENTS.md .github/workflows/guard-ai-configs.yml .github/instructions/review.instructions.md"
       STATUS_CONTEXT: "AI Config Guard"
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
       - name: Resolve Pull Request Metadata
         id: metadata
         env:
           EVENT_NAME: ${{ github.event_name }}
           PR_NUMBER_PR: ${{ github.event.pull_request.number }}
           PR_NUMBER_REVIEW: ${{ github.event.review.pull_request.number }}
-          BASE_SHA_PR: ${{ github.event.pull_request.base.sha }}
-          BASE_SHA_REVIEW: ${{ github.event.review.pull_request.base.sha }}
           HEAD_SHA_PR: ${{ github.event.pull_request.head.sha }}
           HEAD_SHA_REVIEW: ${{ github.event.review.pull_request.head.sha }}
         run: |
           if [ "$EVENT_NAME" = "pull_request_review" ]; then
             echo "pr_number=${PR_NUMBER_PR:-$PR_NUMBER_REVIEW}" >> $GITHUB_OUTPUT
-            echo "base_sha=${BASE_SHA_PR:-$BASE_SHA_REVIEW}" >> $GITHUB_OUTPUT
             echo "head_sha=${HEAD_SHA_PR:-$HEAD_SHA_REVIEW}" >> $GITHUB_OUTPUT
           else
             echo "pr_number=$PR_NUMBER_PR" >> $GITHUB_OUTPUT
-            echo "base_sha=$BASE_SHA_PR" >> $GITHUB_OUTPUT
             echo "head_sha=$HEAD_SHA_PR" >> $GITHUB_OUTPUT
           fi
+          echo "Resolved HEAD SHA: $(grep head_sha "$GITHUB_OUTPUT" | cut -d= -f2)"
 
       - name: Check if sensitive AI configs or workflows changed
         id: check_sensitive_files
         env:
-          BASE_SHA: ${{ steps.metadata.outputs.base_sha }}
-          HEAD_SHA: ${{ steps.metadata.outputs.head_sha }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.metadata.outputs.pr_number }}
         run: |
           SENSITIVE_FILES_UPDATED=false
           MODIFIED_FILES=""
 
-          CHANGED_FILES=$(git diff --name-only "${BASE_SHA}...${HEAD_SHA}")
+          # Use the GitHub API instead of git diff so we don't need to check
+          # out the repository. Extract both filename and previous_filename to
+          # catch renames out of sensitive paths.
+          CHANGED_FILES=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/files" \
+            --paginate --jq '.[] | .filename, (.previous_filename // empty)')
 
           for file in $SENSITIVE_FILES; do
             if echo "$CHANGED_FILES" | grep -q "^$file"; then
@@ -84,8 +113,11 @@ jobs:
             echo "EOF" >> $GITHUB_OUTPUT
           fi
 
+      # On pull_request_review, the status was already set by the earlier
+      # pull_request_target run. Skip to avoid 403 on fork PRs where the
+      # GITHUB_TOKEN lacks statuses:write on the base repo.
       - name: Set status — no sensitive files changed
-        if: steps.check_sensitive_files.outputs.detected != 'true'
+        if: steps.check_sensitive_files.outputs.detected != 'true' && github.event_name != 'pull_request_review'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HEAD_SHA: ${{ steps.metadata.outputs.head_sha }}
@@ -94,29 +126,28 @@ jobs:
           gh api "repos/${REPO}/statuses/${HEAD_SHA}" \
             -f state=success \
             -f context="${STATUS_CONTEXT}" \
-            -f description="No sensitive AI config files changed" || {
-            echo "Could not set status (expected for fork PRs)"
-            exit 0
-          }
+            -f description="No sensitive AI config files changed"
 
       - name: Post PR comment for sensitive files
         if: steps.check_sensitive_files.outputs.detected == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
           PR_NUMBER: ${{ steps.metadata.outputs.pr_number }}
           MODIFIED_FILES_LIST: ${{ steps.check_sensitive_files.outputs.modified_files }}
         run: |
-          COMMENT_EXISTS=$(gh pr view "$PR_NUMBER" --json comments -q '.comments[] | select(.author.login=="github-actions") | select(.body | contains("AI Configuration Guard")) | .id' | head -1)
+          COMMENT_EXISTS=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json comments -q '.comments[] | select(.author.login=="github-actions") | select(.body | contains("AI Configuration Guard")) | .id' | head -1)
           if [ -z "$COMMENT_EXISTS" ]; then
             COMMENT_BODY=$(printf "**AI Configuration Guard**\n\nThis PR modifies sensitive AI configuration files or workflows that require approval from a member of: **@%s**\n\nThe following sensitive files were detected:\n%s\nAn approval from an authorized team member is required before this PR can be merged." "${ALLOWED_APPROVER_TEAM}" "${MODIFIED_FILES_LIST}")
-            gh pr comment "$PR_NUMBER" --body "$COMMENT_BODY"
+            gh pr comment "$PR_NUMBER" --repo "$REPO" --body "$COMMENT_BODY"
           else
             echo "Comment already exists (ID: $COMMENT_EXISTS), skipping duplicate."
           fi
 
-      # Generates "APP_TOKEN" to verify the reviewer belongs to the team of approvers:
-      #   * `pull_request` trigger (fork PRs): Secrets unavailable, step fails ("continue-on-error" prevents job failure).
-      #   * `pull_request_review` trigger (after approval): Runs in base repo context, secrets available, step succeeds.
+      # Generates "APP_TOKEN" to verify the reviewer belongs to the team of
+      # approvers AND to write commit statuses. The GITHUB_TOKEN on
+      # pull_request_review events lacks statuses:write for fork PRs, so the
+      # App token is used for all status writes in the sensitive-files path.
       - name: Generate GitHub App token
         id: app-token
         if: steps.check_sensitive_files.outputs.detected == 'true'
@@ -124,43 +155,28 @@ jobs:
         with:
           app-id: ${{ secrets.APP_ID }}
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
-        continue-on-error: true
 
       - name: Check for team approval and set status
         if: steps.check_sensitive_files.outputs.detected == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           PR_NUMBER: ${{ steps.metadata.outputs.pr_number }}
           HEAD_SHA: ${{ steps.metadata.outputs.head_sha }}
           REPO: ${{ github.repository }}
         run: |
-          # 'APP_TOKEN' will always be empty when both of these are true:
-          #  1) The PR was created from a fork, and
-          #  2) The 'pull_request' trigger is called
-          #
-          # This is because forks CANNOT access secrets loaded into the base repo.
-          #
-          # However, 'APP_TOKEN' will NOT be empty in this situation:
-          #  1) The PR was created from a fork, and
-          #  2) The 'pull_request_review' trigger is called.
-          #
-          # This is because 'pull_request_review' runs in the context of the
-          # base repo, not the fork, so 'pull_request_review' has access to the
-          # base repo's secrets.
-          if [ -z "$APP_TOKEN" ]; then
-            echo "Waiting for approval from a member of ${ALLOWED_APPROVER_TEAM}."
-            echo "(App token unavailable — this is expected for fork PRs.)"
-            echo "A team member's approval will trigger re-evaluation in base repo context."
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::App token unavailable — cannot verify team membership."
             exit 1
           fi
 
-          # Use app token to query team membership (requires org members:read)
-          REVIEWS=$(gh pr view "$PR_NUMBER" --json reviews -q '.reviews[] | select(.state=="APPROVED") | .author.login')
+          # App token is used for all calls: team membership, PR reviews, and
+          # commit status writes. This ensures fork PRs work (GITHUB_TOKEN on
+          # pull_request_review lacks statuses:write for forks).
+          REVIEWS=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json reviews -q '.reviews[] | select(.state=="APPROVED") | .author.login')
 
           ORG=$(echo "${ALLOWED_APPROVER_TEAM}" | cut -d'/' -f1)
           TEAM_SLUG=$(echo "${ALLOWED_APPROVER_TEAM}" | cut -d'/' -f2)
-          TEAM_MEMBERS=$(GH_TOKEN="$APP_TOKEN" gh api "/orgs/${ORG}/teams/${TEAM_SLUG}/members" -q '.[].login')
+          TEAM_MEMBERS=$(gh api "/orgs/${ORG}/teams/${TEAM_SLUG}/members" -q '.[].login')
 
           APPROVED=false
           APPROVER=""
