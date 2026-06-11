@@ -50,6 +50,7 @@ jobs:
               - 'tests/integration/upstream-pulse.spec.js'
             package-analysis:
               - 'modules/product-builds/server/analysis.js'
+              - 'modules/product-builds/server/index.js'
               - 'modules/product-builds/client/views/PackageAnalysisView.vue'
               - 'tests/integration/package-analysis.spec.js'
             releases:
@@ -125,7 +126,7 @@ jobs:
           check_module "upstream-pulse" \
             "^(modules/upstream-pulse/|tests/integration/upstream-pulse\.spec\.js)"
           check_module "package-analysis" \
-            "^(modules/product-builds/server/analysis\.js|modules/product-builds/client/views/PackageAnalysisView\.vue|tests/integration/package-analysis\.spec\.js)"
+            "^(modules/product-builds/server/(analysis|index)\.js|modules/product-builds/client/views/PackageAnalysisView\.vue|tests/integration/package-analysis\.spec\.js)"
           check_module "releases" \
             "^(modules/releases/server/(execution|planning)/|modules/releases/client/views/FeatureDetailView\.vue|modules/releases/client/(execute|plan)/|tests/integration/(execution-data|releases)\.spec\.js)"
           check_module "tv-fv-delta" \

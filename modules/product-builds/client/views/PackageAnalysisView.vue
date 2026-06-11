@@ -219,8 +219,9 @@ async function fetchOnboarded() {
   onboardedLoading.value = true
   try {
     onboarded.value = await apiRequest(`/modules/product-builds/package-reports/onboarded?days=${onboardedDays.value}`)
-  } catch {
+  } catch (err) {
     onboarded.value = null
+    error.value = err.message
   } finally {
     onboardedLoading.value = false
   }

@@ -52,7 +52,7 @@ test.describe('Package Analysis @package-analysis', () => {
     await packageAnalysisLink.click();
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
 
-    await expect(page.locator('text=Package Analysis')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Package Analysis' })).toBeVisible();
 
     expect(page.errors).toHaveLength(0);
   });
@@ -62,8 +62,8 @@ test.describe('Package Analysis @package-analysis', () => {
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
 
-    await expect(page.locator('text=Packages Onboarded')).toBeVisible();
-    await expect(page.locator('text=Daily Report')).toBeVisible();
+    await expect(page.getByRole('button', { name: /Packages Onboarded/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Daily Report/ })).toBeVisible();
 
     expect(page.errors).toHaveLength(0);
   });
@@ -73,7 +73,7 @@ test.describe('Package Analysis @package-analysis', () => {
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
 
-    const dailyTab = page.locator('button').filter({ hasText: 'Daily Report' });
+    const dailyTab = page.getByRole('button', { name: /Daily Report/ });
     await dailyTab.click();
     await page.waitForTimeout(1000);
 

@@ -659,30 +659,34 @@ module.exports = function registerRoutes(router, context) {
     }
   });
 
-  context.registerRefresh('package-analysis', {
-    description: 'Generate daily AIPCC package analysis report from JIRA (after 6am UTC)',
-    order: 200,
-    timeout: 600000,
-    handler: async function() {
-      if (DEMO_MODE) return;
-      const now = new Date();
-      if (now.getUTCHours() < 6) return;
-      const today = now.toISOString().slice(0, 10);
-      const existing = readFromStorage(`${PKG_STORAGE_PREFIX}/${today}.json`);
-      if (existing) return;
-      await generatePackageReport(today);
-    },
-  });
+  if (context.registerRefresh) {
+    context.registerRefresh('package-analysis', {
+      description: 'Generate daily AIPCC package analysis report from JIRA (after 6am UTC)',
+      order: 200,
+      timeout: 600000,
+      handler: async function() {
+        if (DEMO_MODE) return;
+        const now = new Date();
+        if (now.getUTCHours() < 6) return;
+        const today = now.toISOString().slice(0, 10);
+        const existing = readFromStorage(`${PKG_STORAGE_PREFIX}/${today}.json`);
+        if (existing) return;
+        await generatePackageReport(today);
+      },
+    });
+  }
 
-  context.registerDiagnostics(async function() {
-    const index = readFromStorage(PKG_INDEX_PATH);
-    const hasReports = index && index.length > 0;
-    return {
-      status: hasReports ? 'ok' : 'no_data',
-      latestReport: hasReports ? index[0].report_date : null,
-      reportCount: hasReports ? index.length : 0,
-    };
-  });
+  if (context.registerDiagnostics) {
+    context.registerDiagnostics(async function() {
+      const index = readFromStorage(PKG_INDEX_PATH);
+      const hasReports = index && index.length > 0;
+      return {
+        status: hasReports ? 'ok' : 'no_data',
+        latestReport: hasReports ? index[0].report_date : null,
+        reportCount: hasReports ? index.length : 0,
+      };
+    });
+  }
 
   if (context.registerExport) {
     context.registerExport(require('./export'));
