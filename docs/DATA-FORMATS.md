@@ -929,6 +929,62 @@ The API response format:
 
 ---
 
+## Releases — Quality 90-Day Summary (API Response)
+
+**Note:** Computed dynamically by the `GET /api/modules/releases/delivery/quality/90day-summary` endpoint from stored versions and bug files. No stored file — data is derived at request time.
+
+The API response format:
+
+```json
+{
+  "releases": [
+    {
+      "version": "3.4",
+      "products": [
+        {
+          "name": "rhoai-3.4",
+          "bugCount": 12,
+          "daysElapsed": 54,
+          "isComplete": false,
+          "releaseDate": "2026-05-08"
+        },
+        {
+          "name": "rhelai-3.4",
+          "bugCount": 5,
+          "daysElapsed": 54,
+          "isComplete": false,
+          "releaseDate": "2026-05-08"
+        },
+        {
+          "name": "rhaii-3.4",
+          "bugCount": 3,
+          "daysElapsed": 54,
+          "isComplete": false,
+          "releaseDate": "2026-05-08"
+        }
+      ],
+      "total": 20
+    }
+  ]
+}
+```
+
+**Fields (release):**
+- `version` (string): Release family number (e.g., "3.4")
+- `products` (array): Product-level breakdown
+- `total` (number): Total bugs across all products in this release family
+
+**Fields (product):**
+- `name` (string): Full version name (e.g., "rhoai-3.4")
+- `bugCount` (number): Bugs created within 90 days of GA
+- `daysElapsed` (number): Days since GA, capped at 90
+- `isComplete` (boolean): Whether the 90-day tracking window has closed
+- `releaseDate` (string): ISO date (YYYY-MM-DD) of the GA release
+
+Releases are sorted descending by version number (newest first). Only major versions (X.X) are included; z-stream versions (e.g., 3.3.1) are excluded.
+
+---
+
 ## API Tokens — `data/api-tokens.json`
 
 Stores hashed API tokens for bearer-token authentication. Created on first token creation.
@@ -1582,6 +1638,62 @@ Synced from a Google Sheet via the ai-catalyst module (showcase feature). Contai
 | `entries[].quayUrl` | string | Pipe-separated Quay repo URLs |
 | `entries[].otherResourceUrls` | string | Pipe-separated misc resource URLs |
 | `entries[].mermaidSource` | string | Mermaid diagram source (rendered on detail page) |
+
+---
+
+## OKR Hub — Feature Delivery Accuracy
+
+### Config: `okr-hub/feature-delivery-config.json`
+
+```json
+{
+  "releases": [
+    {
+      "name": "Release 3.4",
+      "products": [
+        { "version": "rhoai-3.4", "freezeDate": "2026-03-01", "releaseDate": "2026-05-14" },
+        { "version": "rhelai-3.4", "freezeDate": "2026-02-15", "releaseDate": "2026-03-19" },
+        { "version": "rhaii-3.4", "freezeDate": "2026-02-15", "releaseDate": "2026-03-19" }
+      ]
+    }
+  ]
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `releases[].name` | string | Display name for the release group |
+| `releases[].products[].version` | string | Jira version name used in Target Version and Fix Version queries |
+| `releases[].products[].freezeDate` | ISO date string | Planning freeze cutoff date for committed feature count |
+| `releases[].products[].releaseDate` | ISO date string | GA date for the product version |
+
+### Response: `GET /api/modules/okr-hub/reports/feature-delivery`
+
+```json
+{
+  "releases": [
+    {
+      "name": "Release 3.4",
+      "products": [
+        { "version": "rhoai-3.4", "freezeDate": "2026-03-01", "releaseDate": "2026-05-14", "committed": 42, "delivered": 38, "accuracy": 90 }
+      ],
+      "committed": 42,
+      "delivered": 38,
+      "accuracy": 90
+    }
+  ],
+  "summary": { "committed": 42, "delivered": 38, "accuracy": 90 }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `releases[].products[].committed` | number | Feature count with Target Version set before freeze date |
+| `releases[].products[].delivered` | number | Feature count with Fix Version set to this version |
+| `releases[].products[].accuracy` | number | `round(delivered / committed * 100)`, 0 if committed is 0 |
+| `summary.committed` | number | Total committed across all releases |
+| `summary.delivered` | number | Total delivered across all releases |
+| `summary.accuracy` | number | Overall accuracy percentage |
 
 ---
 
