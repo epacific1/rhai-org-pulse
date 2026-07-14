@@ -5,7 +5,10 @@ import { useVersionMap } from '../composables/useVersionMap.js'
 const {
   data, loading, error, load, refresh, refreshing,
   releases, accelerators, source, allPackageNames, totalVariants,
+  jiraLinks, loadJiraLinks,
 } = useVersionMap()
+
+const JIRA_BASE = 'https://redhat.atlassian.net/browse'
 
 const packageFilter = ref('')
 const selectedAccelerators = ref([])
@@ -46,18 +49,30 @@ function displayVersion(pkg, release, acc) {
 
 function cellTooltip(pkg, release, acc) {
   const entry = getVersion(pkg, release)
+  let tip
   if (!entry) {
-    if (isPlanning(acc, release)) return `${pkg.name}: version not yet decided for ${release}`
-    return ''
+    if (isPlanning(acc, release)) tip = `${pkg.name}: version not yet decided for ${release}`
+    else return ''
+  } else if (entry.dropped) {
+    tip = `${pkg.name}: dropped in ${release}`
+  } else {
+    const ver = entry.version || 'TBD'
+    const prev = prevRelease(release)
+    if (!prev) tip = `${pkg.name} ${ver}`
+    else {
+      const old = getVersion(pkg, prev)
+      if (!old || old.dropped) tip = `${pkg.name} ${ver} (new in ${release})`
+      else if (old.version === ver) tip = `${pkg.name} ${ver} (unchanged)`
+      else tip = `${pkg.name}: ${old.version} → ${ver}`
+    }
   }
-  if (entry.dropped) return `${pkg.name}: dropped in ${release}`
-  const ver = entry.version || 'TBD'
-  const prev = prevRelease(release)
-  if (!prev) return `${pkg.name} ${ver}`
-  const old = getVersion(pkg, prev)
-  if (!old || old.dropped) return `${pkg.name} ${ver} (new in ${release})`
-  if (old.version === ver) return `${pkg.name} ${ver} (unchanged)`
-  return `${pkg.name}: ${old.version} → ${ver}`
+  return tip
+}
+
+function cellTooltipWithLink(pkg, release, acc, link) {
+  let tip = cellTooltip(pkg, release, acc)
+  if (link) tip += ` — ${link.key}`
+  return tip
 }
 
 function isTbd(pkg, release, acc) {
@@ -147,7 +162,62 @@ function clearReleaseFilter() {
 
 const totalPackages = computed(() => allPackageNames.value.length)
 
-onMounted(() => { load() })
+const SHEET_TO_JIRA_BASE = {
+  'CUDA': 'cuda', 'ROCm': 'rocm', 'Google TPU': 'tpu', 'CPU': 'cpu',
+  'Intel Gaudi': 'gaudi', 'AWS Neuron': 'neuron', 'Spyre': 'spyre',
+}
+
+function extractVariantSlug(sheetName, svName) {
+  const base = SHEET_TO_JIRA_BASE[sheetName] || sheetName.toLowerCase()
+  const stripped = svName.replace(new RegExp('^' + sheetName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*', 'i'), '')
+  const versionMatch = stripped.match(/^(\d[\d.]*)/)
+  return versionMatch ? `${base}${versionMatch[1]}` : base
+}
+
+function normalizeRelease(r) {
+  return r.replace(/^RHAI\s+/i, '').replace(/\.+\s/g, ' ').replace(/[-\s]*(EA|GA)[-\s]*/gi, ' $1').replace(/\s+/g, ' ').trim()
+}
+
+function getCellJiraLink(pkg, release, acc, sv) {
+  if (!jiraLinks.value) return null
+  const entry = getVersion(pkg, release)
+  if (!entry) return null
+  return findJiraLink(acc.sheet, sv.name, pkg.name, release)
+}
+
+function findJiraLink(sheetName, svName, pkgName, release) {
+  if (!jiraLinks.value) return null
+  const variant = extractVariantSlug(sheetName, svName)
+  const pkg = pkgName.toLowerCase()
+  const normR = normalizeRelease(release)
+  const candidateReleases = normR.includes('EA') ? [normR] : [`${normR} GA`, normR]
+  for (const rel of candidateReleases) {
+    const epicLink = jiraLinks.value.links[`${variant}:${rel}:${pkg}`]
+    if (epicLink) return { key: epicLink.key, type: 'epic' }
+  }
+  for (const fk of Object.keys(jiraLinks.value.features)) {
+    if (!fk.startsWith(variant)) continue
+    const fRelease = fk.split(':')[1]
+    if (candidateReleases.includes(fRelease)) {
+      const epicLink = jiraLinks.value.links[`${fk}:${pkg}`]
+      if (epicLink) return { key: epicLink.key, type: 'epic' }
+    }
+  }
+  for (const rel of candidateReleases) {
+    const featureLink = jiraLinks.value.features[`${variant}:${rel}`]
+    if (featureLink) return { key: featureLink.key, type: 'feature' }
+  }
+  for (const fk of Object.keys(jiraLinks.value.features)) {
+    if (!fk.startsWith(variant)) continue
+    const fRelease = fk.split(':')[1]
+    if (candidateReleases.includes(fRelease)) return { key: jiraLinks.value.features[fk].key, type: 'feature' }
+  }
+  return null
+}
+onMounted(() => {
+  load()
+  loadJiraLinks()
+})
 </script>
 
 <template>
@@ -347,15 +417,29 @@ onMounted(() => { load() })
                             'text-blue-400 dark:text-blue-500 italic text-xs': isTbd(pkg, r, acc),
                             'text-gray-600 dark:text-gray-300': !isTbd(pkg, r, acc) && !getVersion(pkg, r)?.dropped,
                           }"
-                          :title="cellTooltip(pkg, r, acc)"
                           @pointerenter="hoveredCell = cellKey(sv.name, pkg.name, r)"
                           @pointerleave="hoveredCell = null"
                         >
-                          <span class="inline-flex items-center gap-1">
-                            <svg v-if="versionChanged(pkg, r) && displayVersion(pkg, r, acc) !== 'TBD'" class="w-2 h-2 shrink-0" viewBox="0 0 10 10" aria-label="bumped"><polygon points="5,1 9,9 1,9" fill="#0ca30c" /></svg>
-                            <span>{{ displayVersion(pkg, r, acc) }}</span>
-                            <svg v-if="getVersion(pkg, r)?.tentative" class="w-2 h-2 shrink-0" viewBox="0 0 10 10" aria-label="tentative"><polygon points="5,0 10,5 5,10 0,5" fill="#d97706" /></svg>
-                          </span>
+                          <template v-for="(jlink, _ji) in [getCellJiraLink(pkg, r, acc, sv)]" :key="_ji">
+                            <a
+                              v-if="jlink"
+                              :href="`${JIRA_BASE}/${jlink.key}`"
+                              :title="cellTooltipWithLink(pkg, r, acc, jlink)"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              class="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline"
+                              @click.stop
+                            >
+                              <svg v-if="versionChanged(pkg, r) && displayVersion(pkg, r, acc) !== 'TBD'" class="w-2 h-2 shrink-0" viewBox="0 0 10 10" aria-label="bumped"><polygon points="5,1 9,9 1,9" fill="#0ca30c" /></svg>
+                              <span>{{ displayVersion(pkg, r, acc) }}</span>
+                              <svg v-if="getVersion(pkg, r)?.tentative" class="w-2 h-2 shrink-0" viewBox="0 0 10 10" aria-label="tentative"><polygon points="5,0 10,5 5,10 0,5" fill="#d97706" /></svg>
+                            </a>
+                            <span v-else class="inline-flex items-center gap-1" :title="cellTooltip(pkg, r, acc)">
+                              <svg v-if="versionChanged(pkg, r) && displayVersion(pkg, r, acc) !== 'TBD'" class="w-2 h-2 shrink-0" viewBox="0 0 10 10" aria-label="bumped"><polygon points="5,1 9,9 1,9" fill="#0ca30c" /></svg>
+                              <span>{{ displayVersion(pkg, r, acc) }}</span>
+                              <svg v-if="getVersion(pkg, r)?.tentative" class="w-2 h-2 shrink-0" viewBox="0 0 10 10" aria-label="tentative"><polygon points="5,0 10,5 5,10 0,5" fill="#d97706" /></svg>
+                            </span>
+                          </template>
                         </td>
                       </tr>
                     </tbody>
