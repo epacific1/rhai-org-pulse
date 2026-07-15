@@ -14,6 +14,31 @@
       </div>
     </div>
 
+    <!-- Release Schedule Bar (from Product Pages) -->
+    <div v-if="releaseSchedule" class="rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 dark:from-blue-700 dark:via-indigo-700 dark:to-violet-700 px-6 py-5 shadow-lg text-white mb-6">
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <p class="text-xs font-bold uppercase tracking-widest text-blue-200 mb-1">Viewing Release</p>
+          <h3 class="text-3xl font-extrabold tracking-tight leading-none">{{ selectedVersion }}</h3>
+        </div>
+        <div class="flex flex-wrap gap-3">
+          <div v-if="releaseSchedule.code_freeze_date" class="flex flex-col items-center bg-white/15 backdrop-blur-sm rounded-xl px-5 py-2.5 min-w-[90px]">
+            <span class="text-[10px] font-semibold uppercase tracking-wider text-blue-200 mb-0.5">Code Freeze</span>
+            <span class="text-sm font-bold">{{ formatScheduleDate(releaseSchedule.code_freeze_date) }}</span>
+          </div>
+          <div v-if="releaseSchedule.ga_date" class="flex flex-col items-center bg-white/15 backdrop-blur-sm rounded-xl px-5 py-2.5 min-w-[90px]">
+            <span class="text-[10px] font-semibold uppercase tracking-wider text-blue-200 mb-0.5">GA Date</span>
+            <span class="text-sm font-bold">{{ formatScheduleDate(releaseSchedule.ga_date) }}</span>
+          </div>
+          <div class="flex flex-col items-center rounded-xl px-5 py-2.5 min-w-[90px]"
+            :class="releaseSchedule.status === 'Released' ? 'bg-emerald-500/30' : 'bg-amber-500/30'">
+            <span class="text-[10px] font-semibold uppercase tracking-wider text-blue-200 mb-0.5">Status</span>
+            <span class="text-sm font-bold">{{ releaseSchedule.status }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Release section with version + decision status -->
     <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 mb-6">
       <div class="flex items-center gap-5">
@@ -133,12 +158,13 @@
       <!-- Open Issues to Validate -->
       <div class="mb-6">
         <a
-          :href="openIssuesToValidateUrl"
+          :href="openIssuesToValidate?.jql_url || '#'"
           target="_blank"
           class="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg px-4 py-3 hover:border-blue-400 dark:hover:border-blue-600 transition-colors"
         >
           <h3 class="text-sm font-semibold text-blue-700 dark:text-blue-400">Open Issues to Validate</h3>
-          <span class="text-xs text-blue-500 dark:text-blue-400">View in Jira ↗</span>
+          <span v-if="openIssuesToValidate" class="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium">{{ openIssuesToValidate.total }} open ↗</span>
+          <span v-else class="text-xs text-blue-500 dark:text-blue-400">View in Jira ↗</span>
         </a>
       </div>
 
@@ -336,7 +362,7 @@
                         <div v-else class="h-full bg-gray-500 flex items-center justify-center text-xs font-bold text-white" style="width:100%">0</div>
                       </div>
                     </a>
-                    <a :href="tile.skipped_jql_url || '#'" target="_blank" class="flex items-center gap-2 hover:opacity-80 transition-opacity">
+                    <a v-if="tile.skipped_enabled !== false" :href="tile.skipped_jql_url || '#'" target="_blank" class="flex items-center gap-2 hover:opacity-80 transition-opacity">
                       <span class="text-xs text-gray-400 w-16">Skipped ↗</span>
                       <div class="flex-1 h-6 bg-gray-200 dark:bg-gray-800 rounded overflow-hidden flex">
                         <template v-if="skippedBd(tile).total > 0">
@@ -347,6 +373,10 @@
                         <div v-else class="h-full bg-gray-500 flex items-center justify-center text-xs font-bold text-white" style="width:100%">0</div>
                       </div>
                     </a>
+                    <div v-else class="flex items-center gap-2">
+                      <span class="text-xs text-gray-400 w-16">Skipped</span>
+                      <span class="text-xs text-gray-400 dark:text-gray-500 italic">{{ tile.skipped_label || 'Not yet enabled' }}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -397,11 +427,11 @@
                   target="_blank"
                   class="flex items-center justify-between px-3 py-2 hover:bg-white dark:hover:bg-gray-800 transition-colors border-b border-gray-100 dark:border-gray-700 last:border-b-0"
                 >
-                  <div class="flex items-center gap-2">
-                    <span :class="ragDotSmall(componentRagFromCategory(task.status_category))"></span>
-                    <span class="text-xs text-gray-600 dark:text-gray-400 truncate max-w-[300px]">{{ task.summary }}</span>
+                  <div class="flex items-center gap-2 min-w-0 flex-1">
+                    <span :class="ragDotSmall(componentRagFromCategory(task.status_category))" class="flex-shrink-0"></span>
+                    <span class="text-xs text-gray-600 dark:text-gray-400">{{ task.summary }}</span>
                   </div>
-                  <div class="flex items-center gap-2">
+                  <div class="flex items-center gap-2 flex-shrink-0">
                     <span class="text-xs px-1.5 py-0.5 rounded" :class="statusPillClass(task.status_category)">{{ task.status }}</span>
                     <span class="text-xs text-blue-500 dark:text-blue-400 font-mono">{{ task.key }}</span>
                   </div>
@@ -428,6 +458,7 @@ const {
   loading,
   error,
   versions,
+  defaultVersion,
   loadMetrics,
   loadVersions
 } = useReleaseReadiness()
@@ -438,9 +469,10 @@ const expandedPhases = reactive({})
 
 onMounted(async () => {
   await loadVersions()
-  if (versions.value.length === 1) {
-    selectedVersion.value = versions.value[0]
-    await loadMetrics(selectedVersion.value)
+  if (versions.value.length > 0) {
+    const initial = defaultVersion.value || versions.value[0]
+    selectedVersion.value = initial
+    await loadMetrics(initial)
     if (data.value && data.value.component_readiness) {
       selectedComponents.value = [...(data.value.component_readiness.all_components || [])]
     }
@@ -469,6 +501,12 @@ function formatDate(iso) {
   return iso ? new Date(iso).toLocaleString() : ''
 }
 
+function formatScheduleDate(dateStr) {
+  if (!dateStr) return ''
+  const d = new Date(dateStr + 'T00:00:00')
+  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
 function togglePhase(epicKey) {
   expandedPhases[epicKey] = !expandedPhases[epicKey]
 }
@@ -486,20 +524,14 @@ const overallPct = computed(() => {
   return Math.round(gates.reduce((s, g) => s + g.pct, 0) / gates.length)
 })
 
-const versionVariants = computed(() => {
-  if (data.value && data.value.version_variants) return data.value.version_variants
-  return selectedVersion.value ? [selectedVersion.value] : []
+const releaseSchedule = computed(() => {
+  if (!data.value || !data.value.release_schedule) return null
+  return data.value.release_schedule
 })
 
-const openIssuesToValidateUrl = computed(() => {
-  const variants = versionVariants.value
-  if (!variants.length) return '#'
-  const esc = v => v.replace(/'/g, "\\'")
-  const versionClauses = variants
-    .map(v => `fixVersion = '${esc(v)}' OR 'Target Version' = '${esc(v)}'`)
-    .join(' OR ')
-  const jql = `project in (RHAIENG, RHOAIENG) AND (labels not in (RHOAI-releases, RHOAI-internal, devtestops-service, test-failed, test-skipped) OR labels IS EMPTY) AND (component not in (Documentation, PXE) OR component is EMPTY) AND status not in (Closed, Resolved) AND (${versionClauses})`
-  return `https://redhat.atlassian.net/issues/?jql=${encodeURIComponent(jql)}`
+const openIssuesToValidate = computed(() => {
+  if (!data.value || !data.value.open_issues_to_validate) return null
+  return data.value.open_issues_to_validate
 })
 
 const productBlockers = computed(() => {
@@ -527,7 +559,6 @@ const productBlockers = computed(() => {
   return { ...raw, components: openComponents, total_open: totalOpen, jql_url: jqlUrl }
 })
 
-// Overall Summary: TFA Sign-Off counts from full JQL query
 const testSignOffDone = computed(() => {
   if (!data.value) return 0
   return data.value.tfa_signoff_done ?? 0
