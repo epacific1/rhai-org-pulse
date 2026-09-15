@@ -217,8 +217,18 @@ test.describe('Releases Views @releases', () => {
     await expect(aipccPill).toBeVisible();
     await aipccPill.click();
 
+    await expect(page).toHaveURL(/#\/releases\/schedule\/aipcc$/);
     await expect(page.getByRole('heading', { name: 'AIPCC Release Milestones' })).toBeVisible();
     await expect(page.getByText('Upcoming Milestones')).toBeVisible();
+    expect(page.errors).toHaveLength(0);
+  });
+
+  test('should open AIPCC Milestones from its direct URL', async ({ page }) => {
+    await page.goto('/#/releases/schedule/aipcc');
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.getByRole('heading', { name: 'AIPCC Release Milestones' })).toBeVisible();
+    await expect(page).toHaveURL(/#\/releases\/schedule\/aipcc$/);
     expect(page.errors).toHaveLength(0);
   });
 

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import ScheduleHubView from '../../client/views/ScheduleHubView.vue'
 
@@ -10,6 +10,14 @@ vi.mock('../../client/views/AipccMilestonesView.vue', () => ({
 }))
 
 describe('ScheduleHubView', () => {
+  beforeEach(() => {
+    window.location.hash = '#/releases/schedule'
+  })
+
+  afterEach(() => {
+    window.location.hash = ''
+  })
+
   it('keeps the release schedule as the default without a top milestones tab', async () => {
     const wrapper = mount(ScheduleHubView)
     await flushPromises()
@@ -28,6 +36,16 @@ describe('ScheduleHubView', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('AIPCC milestone content')
+    expect(window.location.hash).toBe('#/releases/schedule/aipcc')
+  })
+
+  it('opens AIPCC milestones from a direct link', async () => {
+    window.location.hash = '#/releases/schedule/aipcc'
+
+    const wrapper = mount(ScheduleHubView)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('AIPCC milestone content')
   })
 
   it('returns from milestones to the release schedule', async () => {
@@ -37,6 +55,19 @@ describe('ScheduleHubView', () => {
     await flushPromises()
 
     await wrapper.find('.schedule-back').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Standard schedule content')
+    expect(window.location.hash).toBe('#/releases/schedule')
+  })
+
+  it('follows browser hash navigation', async () => {
+    window.location.hash = '#/releases/schedule/aipcc'
+    const wrapper = mount(ScheduleHubView)
+    await flushPromises()
+
+    window.location.hash = '#/releases/schedule'
+    window.dispatchEvent(new Event('hashchange'))
     await flushPromises()
 
     expect(wrapper.text()).toContain('Standard schedule content')
