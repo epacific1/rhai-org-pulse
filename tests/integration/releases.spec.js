@@ -232,6 +232,17 @@ test.describe('Releases Views @releases', () => {
     expect(page.errors).toHaveLength(0);
   });
 
+  test('should reflect selected product pills in the Schedule URL', async ({ page }) => {
+    await page.goto('/#/releases/schedule');
+    await page.waitForLoadState('networkidle');
+
+    await page.getByRole('button', { name: 'rhoai', exact: true }).click();
+    await expect(page).toHaveURL(/#\/releases\/schedule\/rhoai$/);
+
+    await page.getByRole('button', { name: 'rhelai', exact: true }).click();
+    await expect(page).toHaveURL(/#\/releases\/schedule\/rhoai\/rhelai$/);
+  });
+
   test('should expose AIPCC milestone data from the Releases API', async ({ request }) => {
     const response = await request.get('/api/modules/releases/aipcc-milestones');
     expect(response.ok()).toBe(true);

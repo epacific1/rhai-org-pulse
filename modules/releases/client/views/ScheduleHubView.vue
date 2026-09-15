@@ -1,6 +1,11 @@
 <template>
   <div>
-    <ScheduleView v-if="activeView === 'release-schedule'" @show-aipcc="showAipccMilestones" />
+    <ScheduleView
+      v-if="activeView === 'release-schedule'"
+      :initial-products="routePills"
+      @products-change="showScheduleProducts"
+      @show-aipcc="showAipccMilestones"
+    />
     <AipccMilestonesView v-else @show-schedule="showReleaseSchedule" />
   </div>
 </template>
@@ -10,28 +15,48 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import ScheduleView from './ScheduleView.vue'
 import AipccMilestonesView from './AipccMilestonesView.vue'
 
-const RELEASE_SCHEDULE_HASH = '#/releases/schedule'
-const AIPCC_MILESTONES_HASH = `${RELEASE_SCHEDULE_HASH}/aipcc`
+const AIPCC_ROUTE_SEGMENT = 'aipcc'
+
+function currentHashRoute() {
+  const [path, query = ''] = (window.location.hash || '').split('?')
+  const segments = path.replace(/^#\/?/, '').split('/').filter(Boolean)
+  return { segments, query }
+}
 
 function viewFromHash() {
-  const path = (window.location.hash || '').split('?')[0].replace(/\/$/, '')
-  return path === AIPCC_MILESTONES_HASH ? 'aipcc-milestones' : 'release-schedule'
+  const { segments } = currentHashRoute()
+  return segments.at(-1) === AIPCC_ROUTE_SEGMENT ? 'aipcc-milestones' : 'release-schedule'
 }
 
 const activeView = ref(viewFromHash())
+const routePills = ref(currentHashRoute().segments.slice(2))
 
 function syncViewFromHash() {
   activeView.value = viewFromHash()
+  routePills.value = currentHashRoute().segments.slice(2)
+}
+
+function navigateToPills(pills) {
+  const { segments, query } = currentHashRoute()
+  const nextSegments = segments.slice(0, 2).concat(pills)
+
+  const hash = `#/${nextSegments.join('/')}${query ? `?${query}` : ''}`
+  if (window.location.hash !== hash) {
+    window.location.hash = hash
+    syncViewFromHash()
+  }
 }
 
 function showAipccMilestones() {
-  activeView.value = 'aipcc-milestones'
-  window.location.hash = AIPCC_MILESTONES_HASH
+  navigateToPills([AIPCC_ROUTE_SEGMENT])
 }
 
 function showReleaseSchedule() {
-  activeView.value = 'release-schedule'
-  window.location.hash = RELEASE_SCHEDULE_HASH
+  navigateToPills([])
+}
+
+function showScheduleProducts(products) {
+  navigateToPills(products)
 }
 
 onMounted(() => {
