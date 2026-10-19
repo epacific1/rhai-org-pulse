@@ -3,7 +3,7 @@ import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import { X, Copy, Check, Search } from 'lucide-vue-next'
 import { useChannelDetail } from '../../composables/useChannels'
 import { WHEEL_KINDS, filterWheels, stackLabel, osLabel } from '../../utils/channels'
-import { formatShortDate, archBadgeClass } from '../../utils/formatting'
+import { formatShortDate, archBadgeClass, getRegistryUrl } from '../../utils/formatting'
 import ChannelName from './ChannelName.vue'
 import MaturityBadge from './MaturityBadge.vue'
 
@@ -292,7 +292,12 @@ function onKeydown(event) {
             <!-- Drops -->
             <div v-if="activeTab === 'drops'" id="channel-panel-drops" role="tabpanel" aria-labelledby="channel-tab-drops" class="pt-4">
               <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500 dark:text-gray-400">
-                <span>Images published to <code class="text-gray-700 dark:text-gray-300">{{ channel.base_image }}</code></span>
+                <span>
+                  Images published to
+                  <a :href="getRegistryUrl(channel.base_image)" target="_blank" rel="noopener noreferrer" class="hover:underline">
+                    <code class="text-gray-700 dark:text-gray-300">{{ channel.base_image }}</code>
+                  </a>
+                </span>
                 <button
                   type="button"
                   class="font-medium text-primary-700 hover:underline dark:text-blue-400"

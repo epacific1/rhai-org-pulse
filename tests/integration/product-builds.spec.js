@@ -556,6 +556,11 @@ test.describe('Product Builds Module @product-builds', () => {
     await expect(page.getByTestId('channel-matrix')).toContainText('RHOAI 3.6-EA2');
     const drawer = page.getByTestId('channel-drawer');
     await expect(drawer).toContainText('RHEL 9.8');
+    const registryLink = drawer.getByRole('link', { name: dashboardChannels.detail.channel.base_image, exact: true });
+    await expect(registryLink).toBeVisible();
+    await expect(registryLink).toHaveAttribute('href', 'https://quay.io/repository/aipcc/base-images/cuda13.0-torch2.11-el9.8?tab=tags');
+    await expect(registryLink).toHaveAttribute('target', '_blank');
+    await expect(registryLink).toHaveAttribute('rel', 'noopener noreferrer');
     await expect(drawer).toContainText('No RHAIBI drop includes this channel yet.');
     await expect(drawer.getByRole('button', { name: 'Copy', exact: true })).toBeVisible();
     await drawer.getByRole('tab', { name: /Wheels/ }).click();
