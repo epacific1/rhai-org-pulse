@@ -127,6 +127,7 @@ export const viewOwners = {
   'releases/plan/feature-readiness':               'Erle Marion',
   'releases/plan/outcomes':                        'Jen Albertson',
   'releases/plan/pm-hub':                          'Saiesh Prabhu',
+  'releases/plan/tech-debt-prioritization':        'Saiesh Prabhu',
 
   // releases > registry
   'releases/registry/hygiene':                     'Alex Corvin',
