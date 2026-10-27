@@ -2235,7 +2235,7 @@ JSON Lines format (one JSON object per line). Partitioned by month for efficient
 
 ## Releases — CHI Hierarchy (`data/releases/chi-hierarchy/latest.json`)
 
-Pre-computed Container Health Index hierarchy for Org Pulse (RHOAIENG-97404). Environments: **Prod** (`catalog.redhat.com`), **Stage** (Stage Pyxis), **Latest** (Konflux clair-scan via KubeArchive). Hierarchy: Product version → Components → Images.
+Pre-computed Container Health Index hierarchy for Org Pulse (RHOAIENG-97404). Environments: **Prod** (`catalog.redhat.com`), **Stage** (Stage Pyxis), **Latest** (Konflux clair-scan via KubeArchive), **Nightly** (`ec-cve-run-tool`, RHEL errata-filtered). Hierarchy: Product version → Components → Images.
 
 Fixture: `fixtures/releases/chi-hierarchy/latest.json`.
 
@@ -2306,6 +2306,29 @@ Fixture: `fixtures/releases/chi-hierarchy/latest.json`.
           }]
         }]
       }]
+    },
+    "nightly": {
+      "fetchedAt": "2026-10-13T11:53:15.000Z",
+      "source": "ec-cve-run-tool (RHEL errata filtered, Konflux Clair scan)",
+      "versions": [{
+        "id": "rhoai-3.6",
+        "tag": "v3.6",
+        "summary": { "imageCount": 2, "gradeDistribution": { "A": 1, "D": 1 }, "critical": 0, "important": 4, "staleImageCount": 1 },
+        "components": [{
+          "name": "AI Core Dashboard",
+          "summary": { "imageCount": 1, "worstGrade": "A", "critical": 0, "important": 0, "oldestImageAgeDays": 0 },
+          "images": [{
+            "name": "odh-dashboard-nightly-rhel9",
+            "grade": "A",
+            "gradeDate": "2026-10-13",
+            "vulnerabilityCount": 0,
+            "advisories": { "Critical": 0, "Important": 0 },
+            "scanNote": "3 CVE(s) excluded (no RHEL errata or non-RHEL fix)",
+            "lastUpdated": "2026-10-13",
+            "ageDays": 0
+          }]
+        }]
+      }]
     }
   }
 }
@@ -2317,7 +2340,7 @@ Fixture: `fixtures/releases/chi-hierarchy/latest.json`.
 | GET | `/api/modules/releases/chi-hierarchy/status` | `releases:read` | Upload / env summary |
 | POST | `/api/modules/releases/chi-hierarchy/bulk` | `releases:write` | Pipeline ingest (skipped in `DEMO_MODE`) |
 
-Image staleness: `ageDays > 14` is treated as stale in the UI. Prod/Stage `grade` / `gradeDate` / `vulnerabilityCount` align with catalog HealthIndex. Latest grades are official CHI from rhel-vex patched Critical/Important (see the in-page grading tip). Latest images use `konfluxUrl` instead of `catalogUrl`.
+Image staleness: `ageDays > 14` is treated as stale in the UI. Prod/Stage `grade` / `gradeDate` / `vulnerabilityCount` align with catalog HealthIndex. Latest (Konflux builds) grades are official CHI from rhel-vex patched Critical/Important (see the in-page grading tip). Latest images use `konfluxUrl` instead of `catalogUrl`. Nightly images carry an optional `scanNote` string explaining excluded CVEs (RHEL errata filtering); it is shown in the image table when the Nightly tab is active.
 
 `catalogUrl` must include the Pyxis repository `_id` final path segment (e.g. `…/odh-dashboard-rhel9/680cdd696ed1cf1f6cf2a587`); without it catalog.redhat.com returns 404.
 

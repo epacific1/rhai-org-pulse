@@ -3559,6 +3559,44 @@ test.describe('Releases CHI Hierarchy Report @releases', () => {
     expect(page.errors).toHaveLength(0);
   });
 
+  test('CHI hierarchy API includes nightly env in fixture', async ({ request }) => {
+    const res = await request.get('/api/modules/releases/chi-hierarchy/data');
+    expect(res.ok()).toBe(true);
+    const body = await res.json();
+    expect(body.environments.nightly).toBeTruthy();
+    expect(body.environments.nightly.source).toMatch(/ec-cve-run-tool/);
+    expect(Array.isArray(body.environments.nightly.versions)).toBe(true);
+    expect(body.environments.nightly.versions.length).toBeGreaterThan(0);
+  });
+
+  test('Nightly builds toggle shows nightly source and grading tip mentions ec-cve-run-tool', async ({ page }) => {
+    await page.goto('/#/releases/reports?report=container-health-index');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    await page.getByRole('button', { name: 'Nightly builds', exact: true }).click();
+    await page.waitForTimeout(500);
+
+    await expect(page.getByRole('button', { name: 'Nightly builds', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByText('ec-cve-run-tool').first()).toBeVisible();
+    await expect(page.getByText('rhel-vex').first()).toBeAttached();
+    expect(page.errors).toHaveLength(0);
+  });
+
+  test('Nightly builds version dropdown shows nightly versions independently of activeStreams', async ({ page }) => {
+    await page.goto('/#/releases/reports?report=container-health-index');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    await page.getByRole('button', { name: 'Nightly builds', exact: true }).click();
+    await page.waitForTimeout(500);
+
+    await expect(page.locator('#chi-version')).toBeVisible();
+    const options = await page.locator('#chi-version option').allTextContents();
+    expect(options.length).toBeGreaterThan(0);
+    expect(page.errors).toHaveLength(0);
+  });
+
   test('expanding a component shows image grade and age', async ({ page }) => {
     await page.goto('/#/releases/reports?report=container-health-index');
     await page.waitForLoadState('networkidle');
