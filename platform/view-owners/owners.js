@@ -125,7 +125,6 @@ export const viewOwners = {
   'releases/plan/ai-planner':                      'yuvalluria',
   'releases/plan/bu-feedback':                     'Saiesh Prabhu',
   'releases/plan/feature-readiness':               'Erle Marion',
-  'releases/plan/outcomes':                        'Jen Albertson',
   'releases/plan/pm-hub':                          'Saiesh Prabhu',
   'releases/plan/tech-debt-prioritization':        'Saiesh Prabhu',
 

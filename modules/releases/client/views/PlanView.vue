@@ -16,8 +16,7 @@
       </nav>
     </div>
     <div class="p-6">
-      <DashboardView v-if="activeTab === 'outcomes'" />
-      <FeatureReadinessView v-else-if="activeTab === 'feature-readiness'" />
+      <FeatureReadinessView v-if="activeTab === 'feature-readiness'" />
       <TechDebtPrioritizationView v-else-if="activeTab === 'tech-debt-prioritization'" />
       <DraftPlansView v-else-if="activeTab === 'draft-plans' && canViewDraftPlans" />
       <BuFeedbackView v-else-if="activeTab === 'bu-feedback'" />
@@ -32,7 +31,6 @@
 <script setup>
 import { ref, computed, inject, watch, onMounted } from 'vue'
 import { apiRequest } from '@shared/client/services/api'
-import DashboardView from '../plan/views/DashboardView.vue'
 import FeatureReadinessView from '../plan/views/FeatureReadinessView.vue'
 import TechDebtPrioritizationView from '../plan/views/TechDebtPrioritizationView.vue'
 import DraftPlansView from '../plan/views/DraftPlansView.vue'
@@ -41,7 +39,6 @@ import PmHubView from '../plan/views/PmHubView.vue'
 import AIPlanner from '../plan/views/AIPlanner.vue'
 
 var ALL_TABS = [
-  { id: 'outcomes', label: 'Big Rocks' },
   { id: 'pm-hub', label: 'PM Hub' },
   { id: 'feature-readiness', label: 'Features List (1-n)' },
   { id: 'tech-debt-prioritization', label: 'Tech Debt Prioritization' },
@@ -70,10 +67,10 @@ function getTabFromParams() {
   var tab = params.tab
   var ids = validTabIds()
   if (tab && ids.indexOf(tab) !== -1) return tab
-  return 'outcomes'
+  return 'pm-hub'
 }
 
-const activeTab = ref('outcomes')
+const activeTab = ref('pm-hub')
 
 // Latches on first visit so the planner is not loaded for people who never open it.
 const plannerOpened = ref(false)
@@ -85,7 +82,7 @@ function syncActiveTab() {
   var tab = getTabFromParams()
   // Deep-link to draft-plans while gated → fall back until access resolves or deny.
   if (tab === 'draft-plans' && !canViewDraftPlans.value) {
-    activeTab.value = 'outcomes'
+    activeTab.value = 'pm-hub'
     return
   }
   activeTab.value = tab
@@ -101,7 +98,7 @@ if (moduleNav && moduleNav.params) {
   watch(moduleNav.params, function() {
     var tab = getTabFromParams()
     if (tab === 'draft-plans' && !canViewDraftPlans.value) {
-      if (activeTab.value !== 'outcomes') activeTab.value = 'outcomes'
+      if (activeTab.value !== 'pm-hub') activeTab.value = 'pm-hub'
       return
     }
     if (tab !== activeTab.value) activeTab.value = tab
